@@ -1,0 +1,663 @@
+column,block,symbol,matched,reason,n_sets_hallmark,n_sets_reactome,alias_applied
+brca1,rna,BRCA1,True,,4,60,False
+brca2,rna,BRCA2,True,,3,27,False
+palb2,rna,PALB2,True,,0,25,False
+pten,rna,PTEN,True,,3,35,False
+tp53,rna,TP53,True,,4,129,False
+atm,rna,ATM,True,,0,61,False
+cdh1,rna,CDH1,True,,3,45,False
+chek2,rna,CHEK2,True,,1,24,False
+nbn,rna,NBN,True,,2,44,False
+nf1,rna,NF1,True,,3,9,False
+stk11,rna,STK11,True,,0,14,False
+bard1,rna,BARD1,True,,3,43,False
+mlh1,rna,MLH1,True,,1,24,False
+msh2,rna,MSH2,True,,2,21,False
+msh6,rna,MSH6,True,,0,14,False
+pms2,rna,PMS2,True,,1,20,False
+epcam,rna,EPCAM,True,,1,8,False
+rad51c,rna,RAD51C,True,,2,25,False
+rad51d,rna,RAD51D,True,,0,24,False
+rad50,rna,RAD50,True,,1,47,False
+rb1,rna,RB1,True,,2,65,False
+rbl1,rna,RBL1,True,,1,21,False
+rbl2,rna,RBL2,True,,0,21,False
+ccna1,rna,CCNA1,True,,4,62,False
+ccnb1,rna,CCNB1,True,,0,57,False
+cdk1,rna,CDK1,True,,6,80,False
+ccne1,rna,CCNE1,True,,3,46,False
+cdk2,rna,CDK2,True,,4,75,False
+cdc25a,rna,CDC25A,True,,3,29,False
+ccnd1,rna,CCND1,True,,7,56,False
+cdk4,rna,CDK4,True,,5,56,False
+cdk6,rna,CDK6,True,,2,28,False
+ccnd2,rna,CCND2,True,,7,16,False
+cdkn2a,rna,CDKN2A,True,,3,58,False
+cdkn2b,rna,CDKN2B,True,,2,19,False
+myc,rna,MYC,True,,10,77,False
+cdkn1a,rna,CDKN1A,True,,10,74,False
+cdkn1b,rna,CDKN1B,True,,6,53,False
+e2f1,rna,E2F1,True,,2,46,False
+e2f2,rna,E2F2,True,,2,20,False
+e2f3,rna,E2F3,True,,1,21,False
+e2f4,rna,E2F4,True,,1,28,False
+e2f5,rna,E2F5,True,,1,30,False
+e2f6,rna,E2F6,True,,0,9,False
+e2f7,rna,E2F7,True,,0,11,False
+e2f8,rna,E2F8,True,,1,11,False
+src,rna,SRC,True,,2,170,False
+jak1,rna,JAK1,True,,1,61,False
+jak2,rna,JAK2,True,,5,70,False
+stat1,rna,STAT1,True,,3,74,False
+stat2,rna,STAT2,True,,4,21,False
+stat3,rna,STAT3,True,,2,87,False
+stat5a,rna,STAT5A,True,,2,45,False
+stat5b,rna,STAT5B,True,,0,40,False
+mdm2,rna,MDM2,True,,1,56,False
+tp53bp1,rna,TP53BP1,True,,0,17,False
+adam10,rna,ADAM10,True,,2,40,False
+adam17,rna,ADAM17,True,,2,38,False
+aph1a,rna,APH1A,True,,1,37,False
+aph1b,rna,APH1B,True,,0,37,False
+arrdc1,rna,ARRDC1,False,symbol not found in any configured gene-set file,0,0,False
+cir1,rna,CIR1,False,symbol not found in any configured gene-set file,0,0,False
+ctbp1,rna,CTBP1,True,,1,24,False
+ctbp2,rna,CTBP2,True,,0,20,False
+cul1,rna,CUL1,True,,4,120,False
+dll1,rna,DLL1,True,,2,34,False
+dll3,rna,DLL3,True,,0,4,False
+dll4,rna,DLL4,True,,0,24,False
+dtx1,rna,DTX1,True,,1,4,False
+dtx2,rna,DTX2,True,,1,4,False
+dtx3,rna,DTX3,False,symbol not found in any configured gene-set file,0,0,False
+dtx4,rna,DTX4,True,,1,12,False
+ep300,rna,EP300,True,,0,153,False
+fbxw7,rna,FBXW7,True,,1,25,False
+hdac1,rna,HDAC1,True,,1,117,False
+hdac2,rna,HDAC2,True,,2,81,False
+hes1,rna,HES1,True,,3,30,False
+hes5,rna,HES5,True,,0,17,False
+heyl,rna,HEYL,True,,1,21,False
+itch,rna,ITCH,True,,0,36,False
+jag1,rna,JAG1,True,,5,35,False
+jag2,rna,JAG2,True,,3,19,False
+kdm5a,rna,KDM5A,True,,0,7,False
+lfng,rna,LFNG,True,,2,15,False
+maml1,rna,MAML1,True,,1,34,False
+maml2,rna,MAML2,True,,1,34,False
+maml3,rna,MAML3,True,,0,34,False
+ncor2,rna,NCOR2,True,,4,63,False
+ncstn,rna,NCSTN,True,,1,42,False
+notch1,rna,NOTCH1,True,,4,62,False
+notch2,rna,NOTCH2,True,,5,23,False
+notch3,rna,NOTCH3,True,,1,19,False
+nrarp,rna,NRARP,False,symbol not found in any configured gene-set file,0,0,False
+numb,rna,NUMB,True,,1,13,False
+numbl,rna,NUMBL,False,symbol not found in any configured gene-set file,0,0,False
+psen1,rna,PSEN1,True,,3,40,False
+psen2,rna,PSEN2,True,,4,35,False
+psenen,rna,PSENEN,True,,1,37,False
+rbpj,rna,RBPJ,True,,2,35,False
+rbpjl,rna,RBPJL,False,symbol not found in any configured gene-set file,0,0,False
+rfng,rna,RFNG,True,,0,4,False
+snw1,rna,SNW1,True,,0,44,False
+spen,rna,SPEN,True,,0,6,False
+hes2,rna,HES2,False,symbol not found in any configured gene-set file,0,0,False
+hes4,rna,HES4,False,symbol not found in any configured gene-set file,0,0,False
+hes7,rna,HES7,True,,0,4,False
+hey1,rna,HEY1,True,,2,25,False
+hey2,rna,HEY2,True,,2,23,False
+acvr1,rna,ACVR1,True,,1,0,False
+acvr1b,rna,ACVR1B,True,,3,6,False
+acvr1c,rna,ACVR1C,True,,0,6,False
+acvr2a,rna,ACVR2A,True,,3,9,False
+acvr2b,rna,ACVR2B,True,,0,7,False
+acvrl1,rna,ACVRL1,True,,1,3,False
+akt1,rna,AKT1,True,,3,113,False
+akt1s1,rna,AKT1S1,True,,1,14,False
+akt2,rna,AKT2,True,,3,98,False
+apaf1,rna,APAF1,True,,1,21,False
+arl11,rna,ARL11,False,symbol not found in any configured gene-set file,0,0,False
+atr,rna,ATR,True,,0,39,False
+aurka,rna,AURKA,True,,6,24,False
+bad,rna,BAD,True,,0,18,False
+bcl2,rna,BCL2,True,,4,30,False
+bcl2l1,rna,BCL2L1,True,,2,34,False
+bmp10,rna,BMP10,True,,0,6,False
+bmp15,rna,BMP15,True,,0,4,False
+bmp2,rna,BMP2,True,,7,11,False
+bmp3,rna,BMP3,False,symbol not found in any configured gene-set file,0,0,False
+bmp4,rna,BMP4,True,,0,19,False
+bmp5,rna,BMP5,False,symbol not found in any configured gene-set file,0,0,False
+bmp6,rna,BMP6,True,,1,0,False
+bmp7,rna,BMP7,True,,0,7,False
+bmpr1a,rna,BMPR1A,True,,2,3,False
+bmpr1b,rna,BMPR1B,True,,3,3,False
+bmpr2,rna,BMPR2,True,,2,3,False
+braf,rna,BRAF,True,,1,39,False
+casp10,rna,CASP10,True,,1,14,False
+casp3,rna,CASP3,True,,5,35,False
+casp6,rna,CASP6,True,,4,12,False
+casp7,rna,CASP7,True,,4,12,False
+casp8,rna,CASP8,True,,3,59,False
+casp9,rna,CASP9,True,,3,25,False
+chek1,rna,CHEK1,True,,2,33,False
+csf1,rna,CSF1,True,,6,15,False
+csf1r,rna,CSF1R,True,,0,9,False
+cxcl8,rna,CXCL8,True,,2,20,False
+cxcr1,rna,CXCR1,True,,0,11,False
+cxcr2,rna,CXCR2,True,,0,11,False
+dab2,rna,DAB2,True,,2,8,False
+diras3,rna,DIRAS3,False,symbol not found in any configured gene-set file,0,0,False
+dlec1,rna,DLEC1,False,symbol not found in any configured gene-set file,0,0,False
+dph1,rna,DPH1,True,,0,4,False
+egfr,rna,EGFR,True,,6,74,False
+eif4e,rna,EIF4E,True,,3,35,False
+eif4ebp1,rna,EIF4EBP1,True,,1,8,False
+eif5a2,rna,EIF5A2,True,,0,4,False
+erbb2,rna,ERBB2,True,,2,52,False
+erbb3,rna,ERBB3,True,,2,27,False
+erbb4,rna,ERBB4,True,,0,39,False
+fas,rna,FAS,True,,7,19,False
+fgf1,rna,FGF1,True,,0,70,False
+fgfr1,rna,FGFR1,True,,1,47,False
+folr1,rna,FOLR1,True,,0,10,False
+folr2,rna,FOLR2,True,,0,7,False
+folr3,rna,FOLR3,True,,0,3,False
+foxo1,rna,FOXO1,True,,1,27,False
+foxo3,rna,FOXO3,True,,3,39,False
+gdf11,rna,GDF11,False,symbol not found in any configured gene-set file,0,0,False
+gdf2,rna,GDF2,True,,0,3,False
+gsk3b,rna,GSK3B,True,,2,78,False
+hif1a,rna,HIF1A,True,,4,30,False
+hla-g,rna,HLA-G,True,,2,19,False
+hras,rna,HRAS,True,,4,142,False
+igf1,rna,IGF1,True,,2,14,False
+igf1r,rna,IGF1R,True,,3,14,False
+inha,rna,INHA,True,,1,10,False
+inhba,rna,INHBA,True,,5,11,False
+inhbc,rna,INHBC,True,,0,4,False
+itgav,rna,ITGAV,True,,4,35,False
+itgb3,rna,ITGB3,True,,5,50,False
+izumo1r,rna,IZUMO1R,True,,0,3,False
+kdr,rna,KDR,True,,0,21,False
+kit,rna,KIT,True,,1,37,False
+kras,rna,KRAS,True,,0,150,False
+map2k1,rna,MAP2K1,True,,0,61,False
+map2k2,rna,MAP2K2,True,,0,36,False
+map2k3,rna,MAP2K3,True,,4,32,False
+map2k4,rna,MAP2K4,True,,0,37,False
+map2k5,rna,MAP2K5,True,,1,5,False
+map3k1,rna,MAP3K1,True,,2,19,False
+map3k3,rna,MAP3K3,True,,0,5,False
+map3k4,rna,MAP3K4,False,symbol not found in any configured gene-set file,0,0,False
+map3k5,rna,MAP3K5,True,,0,4,False
+mapk1,rna,MAPK1,True,,2,180,False
+mapk12,rna,MAPK12,True,,1,22,False
+mapk14,rna,MAPK14,True,,3,82,False
+mapk3,rna,MAPK3,True,,0,174,False
+mapk4,rna,MAPK4,True,,0,3,False
+mapk6,rna,MAPK6,True,,0,3,False
+mapk7,rna,MAPK7,True,,0,43,False
+mapk8,rna,MAPK8,True,,1,58,False
+mapk9,rna,MAPK9,True,,1,35,False
+mdc1,rna,MDC1,True,,0,22,False
+mlst8,rna,MLST8,True,,0,45,False
+mmp1,rna,MMP1,True,,2,13,False
+mmp10,rna,MMP10,True,,2,7,False
+mmp11,rna,MMP11,True,,2,4,False
+mmp12,rna,MMP12,True,,1,3,False
+mmp13,rna,MMP13,True,,1,11,False
+mmp14,rna,MMP14,True,,5,12,False
+mmp15,rna,MMP15,True,,2,4,False
+mmp16,rna,MMP16,True,,1,7,False
+mmp17,rna,MMP17,True,,0,3,False
+mmp19,rna,MMP19,True,,0,3,False
+mmp2,rna,MMP2,True,,4,21,False
+mmp21,rna,MMP21,False,symbol not found in any configured gene-set file,0,0,False
+mmp23b,rna,MMP23B,False,symbol not found in any configured gene-set file,0,0,False
+mmp24,rna,MMP24,True,,0,3,False
+mmp25,rna,MMP25,True,,0,6,False
+mmp26,rna,MMP26,False,symbol not found in any configured gene-set file,0,0,False
+mmp27,rna,MMP27,False,symbol not found in any configured gene-set file,0,0,False
+mmp28,rna,MMP28,False,symbol not found in any configured gene-set file,0,0,False
+mmp3,rna,MMP3,True,,2,19,False
+mmp7,rna,MMP7,True,,1,10,False
+mmp9,rna,MMP9,True,,4,28,False
+mtor,rna,MTOR,True,,1,45,False
+nfkb1,rna,NFKB1,True,,4,104,False
+nfkb2,rna,NFKB2,True,,1,63,False
+opcml,rna,OPCML,True,,0,3,False
+pdgfa,rna,PDGFA,True,,2,27,False
+pdgfb,rna,PDGFB,True,,3,21,False
+pdgfra,rna,PDGFRA,True,,0,24,False
+pdgfrb,rna,PDGFRB,True,,3,15,False
+pdpk1,rna,PDPK1,True,,0,77,False
+peg3,rna,PEG3,True,,1,0,False
+pik3ca,rna,PIK3CA,True,,1,137,False
+pik3r1,rna,PIK3R1,True,,0,156,False
+pik3r2,rna,PIK3R2,True,,0,102,False
+plagl1,rna,PLAGL1,True,,1,6,False
+ptk2,rna,PTK2,True,,3,53,False
+rab25,rna,RAB25,True,,0,3,False
+rad51,rna,RAD51,True,,1,29,False
+raf1,rna,RAF1,True,,3,37,False
+rassf1,rna,RASSF1,False,symbol not found in any configured gene-set file,0,0,False
+rheb,rna,RHEB,True,,0,19,False
+rictor,rna,RICTOR,True,,1,32,False
+rps6,rna,RPS6,True,,1,68,False
+rps6ka1,rna,RPS6KA1,True,,1,52,False
+rps6ka2,rna,RPS6KA2,True,,2,50,False
+rps6kb1,rna,RPS6KB1,True,,0,3,False
+rps6kb2,rna,RPS6KB2,True,,0,8,False
+rptor,rna,RPTOR,True,,1,27,False
+slc19a1,rna,SLC19A1,True,,2,4,False
+smad1,rna,SMAD1,True,,1,17,False
+smad2,rna,SMAD2,True,,1,36,False
+smad3,rna,SMAD3,True,,4,54,False
+smad4,rna,SMAD4,True,,0,49,False
+smad5,rna,SMAD5,True,,1,3,False
+smad6,rna,SMAD6,True,,1,8,False
+smad7,rna,SMAD7,True,,3,21,False
+smad9,rna,SMAD9,True,,0,3,False
+sptbn1,rna,SPTBN1,True,,2,33,False
+terc,rna,TERC,False,symbol not found in any configured gene-set file,0,0,False
+tert,rna,TERT,True,,0,13,False
+tgfb1,rna,TGFB1,True,,7,52,False
+tgfb2,rna,TGFB2,True,,4,14,False
+tgfb3,rna,TGFB3,True,,1,12,False
+tgfbr1,rna,TGFBR1,True,,1,23,False
+tgfbr2,rna,TGFBR2,True,,1,23,False
+tgfbr3,rna,TGFBR3,True,,3,18,False
+tsc1,rna,TSC1,True,,2,15,False
+tsc2,rna,TSC2,True,,2,22,False
+vegfa,rna,VEGFA,True,,7,31,False
+vegfb,rna,VEGFB,True,,1,9,False
+wfdc2,rna,WFDC2,True,,0,3,False
+wwox,rna,WWOX,True,,0,10,False
+zfyve9,rna,ZFYVE9,True,,0,12,False
+arid1a,rna,ARID1A,True,,0,34,False
+arid1b,rna,ARID1B,True,,0,24,False
+cbfb,rna,CBFB,True,,0,34,False
+gata3,rna,GATA3,True,,2,24,False
+kmt2c,rna,KMT2C,True,,0,26,False
+kmt2d,rna,KMT2D,True,,1,26,False
+myh9,rna,MYH9,True,,5,43,False
+ncor1,rna,NCOR1,True,,0,70,False
+pde4dip,rna,PDE4DIP,True,,1,0,False
+ptprd,rna,PTPRD,True,,1,4,False
+ros1,rna,ROS1,True,,1,0,False
+runx1,rna,RUNX1,True,,1,42,False
+tbx3,rna,TBX3,True,,0,3,False
+abcb1,rna,ABCB1,True,,4,7,False
+abcb11,rna,ABCB11,True,,1,11,False
+abcc1,rna,ABCC1,True,,2,24,False
+abcc10,rna,ABCC10,True,,0,2,False
+bbc3,rna,BBC3,True,,0,14,False
+bmf,rna,BMF,True,,1,6,False
+cyp2c8,rna,CYP2C8,True,,0,17,False
+cyp3a4,rna,CYP3A4,True,,0,15,False
+fgf2,rna,FGF2,True,,2,92,False
+fn1,rna,FN1,True,,3,67,False
+map2,rna,MAP2,False,symbol not found in any configured gene-set file,0,0,False
+map4,rna,MAP4,False,symbol not found in any configured gene-set file,0,0,False
+mapt,rna,MAPT,True,,2,16,False
+nr1i2,rna,NR1I2,True,,2,9,False
+slco1b3,rna,SLCO1B3,True,,0,17,False
+tubb1,rna,TUBB1,True,,0,90,False
+tubb4a,rna,TUBB4A,True,,0,97,False
+tubb4b,rna,TUBB4B,True,,0,101,False
+twist1,rna,TWIST1,True,,0,23,False
+adgra2,rna,ADGRA2,True,,1,0,False
+afdn,rna,AFDN,True,,0,4,False
+aff2,rna,AFF2,False,symbol not found in any configured gene-set file,0,0,False
+agmo,rna,AGMO,True,,0,4,False
+agtr2,rna,AGTR2,True,,0,9,False
+ahnak,rna,AHNAK,True,,1,0,False
+ahnak2,rna,AHNAK2,False,symbol not found in any configured gene-set file,0,0,False
+akap9,rna,AKAP9,True,,0,25,False
+alk,rna,ALK,True,,0,17,False
+apc,rna,APC,True,,2,31,False
+arid2,rna,ARID2,True,,0,11,False
+arid5b,rna,ARID5B,True,,2,3,False
+asxl1,rna,ASXL1,True,,0,4,False
+asxl2,rna,ASXL2,True,,0,4,False
+bap1,rna,BAP1,True,,0,8,False
+bcas3,rna,BCAS3,False,symbol not found in any configured gene-set file,0,0,False
+birc6,rna,BIRC6,True,,0,5,False
+cacna2d3,rna,CACNA2D3,True,,0,3,False
+ccnd3,rna,CCND3,True,,6,22,False
+chd1,rna,CHD1,True,,0,8,False
+clk3,rna,CLK3,False,symbol not found in any configured gene-set file,0,0,False
+clrn2,rna,CLRN2,False,symbol not found in any configured gene-set file,0,0,False
+col12a1,rna,COL12A1,True,,1,7,False
+col22a1,rna,COL22A1,True,,0,4,False
+col6a3,rna,COL6A3,True,,2,17,False
+ctcf,rna,CTCF,True,,2,7,False
+ctnna1,rna,CTNNA1,True,,1,27,False
+ctnna3,rna,CTNNA3,False,symbol not found in any configured gene-set file,0,0,False
+dnah11,rna,DNAH11,False,symbol not found in any configured gene-set file,0,0,False
+dnah2,rna,DNAH2,False,symbol not found in any configured gene-set file,0,0,False
+dnah5,rna,DNAH5,False,symbol not found in any configured gene-set file,0,0,False
+dtwd2,rna,DTWD2,False,symbol not found in any configured gene-set file,0,0,False
+fam20c,rna,FAM20C,True,,0,4,False
+fanca,rna,FANCA,True,,0,7,False
+fancd2,rna,FANCD2,True,,0,7,False
+flt3,rna,FLT3,True,,0,46,False
+foxp1,rna,FOXP1,True,,0,2,False
+frmd3,rna,FRMD3,False,symbol not found in any configured gene-set file,0,0,False
+gh1,rna,GH1,True,,0,7,False
+gldc,rna,GLDC,True,,1,4,False
+gpr32,rna,GPR32,True,,0,4,False
+gps2,rna,GPS2,True,,0,31,False
+hdac9,rna,HDAC9,True,,2,20,False
+herc2,rna,HERC2,True,,0,21,False
+hist1h2bc,rna,H2BC4,True,,0,143,True
+kdm3a,rna,KDM3A,True,,1,7,False
+kdm6a,rna,KDM6A,True,,0,20,False
+klrg1,rna,KLRG1,True,,0,3,False
+l1cam,rna,L1CAM,True,,1,10,False
+lama2,rna,LAMA2,True,,2,24,False
+lamb3,rna,LAMB3,True,,2,28,False
+large1,rna,LARGE1,True,,3,10,False
+ldlrap1,rna,LDLRAP1,True,,1,17,False
+lifr,rna,LIFR,True,,2,10,False
+lipi,rna,LIPI,True,,0,5,False
+magea8,rna,MAGEA8,False,symbol not found in any configured gene-set file,0,0,False
+map3k10,rna,MAP3K10,False,symbol not found in any configured gene-set file,0,0,False
+map3k13,rna,MAP3K13,False,symbol not found in any configured gene-set file,0,0,False
+men1,rna,MEN1,True,,0,26,False
+mtap,rna,MTAP,True,,0,10,False
+muc16,rna,MUC16,True,,0,16,False
+myo1a,rna,MYO1A,False,symbol not found in any configured gene-set file,0,0,False
+myo3a,rna,MYO3A,True,,0,4,False
+ncoa3,rna,NCOA3,True,,2,21,False
+nek1,rna,NEK1,True,,0,4,False
+nf2,rna,NF2,True,,2,9,False
+npnt,rna,NPNT,True,,0,4,False
+nr2f1,rna,NR2F1,True,,0,4,False
+nr3c1,rna,NR3C1,True,,3,28,False
+nras,rna,NRAS,True,,0,141,False
+nrg3,rna,NRG3,True,,0,29,False
+nt5e,rna,NT5E,True,,3,14,False
+or6a2,rna,OR6A2,True,,0,3,False
+palld,rna,PALLD,True,,1,0,False
+pbrm1,rna,PBRM1,True,,0,11,False
+ppp2cb,rna,PPP2CB,True,,2,126,False
+ppp2r2a,rna,PPP2R2A,True,,0,20,False
+prkacg,rna,PRKACG,True,,0,79,False
+prkce,rna,PRKCE,True,,1,17,False
+prkcq,rna,PRKCQ,True,,0,36,False
+prkcz,rna,PRKCZ,True,,0,19,False
+prkg1,rna,PRKG1,True,,0,17,False
+prps2,rna,PRPS2,True,,1,4,False
+prr16,rna,PRR16,False,symbol not found in any configured gene-set file,0,0,False
+ptpn22,rna,PTPN22,True,,0,5,False
+ptprm,rna,PTPRM,True,,1,0,False
+rasgef1b,rna,RASGEF1B,False,symbol not found in any configured gene-set file,0,0,False
+rpgr,rna,RPGR,False,symbol not found in any configured gene-set file,0,0,False
+ryr2,rna,RYR2,True,,1,6,False
+sbno1,rna,SBNO1,False,symbol not found in any configured gene-set file,0,0,False
+setd1a,rna,SETD1A,True,,0,11,False
+setd2,rna,SETD2,True,,0,3,False
+setdb1,rna,SETDB1,True,,0,8,False
+sf3b1,rna,SF3B1,True,,0,20,False
+sgcd,rna,SGCD,True,,2,3,False
+shank2,rna,SHANK2,True,,0,3,False
+siah1,rna,SIAH1,True,,1,10,False
+sik1,rna,SIK1,True,,1,2,False
+sik2,rna,SIK2,False,symbol not found in any configured gene-set file,0,0,False
+smarcb1,rna,SMARCB1,True,,0,26,False
+smarcc1,rna,SMARCC1,True,,3,27,False
+smarcc2,rna,SMARCC2,True,,0,26,False
+smarcd1,rna,SMARCD1,True,,0,27,False
+spaca1,rna,SPACA1,False,symbol not found in any configured gene-set file,0,0,False
+stab2,rna,STAB2,True,,0,8,False
+stmn2,rna,STMN2,True,,0,5,False
+syne1,rna,SYNE1,True,,1,4,False
+taf1,rna,TAF1,True,,0,25,False
+taf4b,rna,TAF4B,True,,0,25,False
+tbl1xr1,rna,TBL1XR1,True,,0,63,False
+tg,rna,TG,True,,1,0,False
+thada,rna,THADA,True,,0,3,False
+thsd7a,rna,THSD7A,True,,0,9,False
+ttyh1,rna,TTYH1,True,,0,3,False
+ubr5,rna,UBR5,False,symbol not found in any configured gene-set file,0,0,False
+ush2a,rna,USH2A,False,symbol not found in any configured gene-set file,0,0,False
+usp9x,rna,USP9X,True,,0,22,False
+utrn,rna,UTRN,True,,0,6,False
+zfp36l1,rna,ZFP36L1,True,,1,3,False
+ackr3,rna,ACKR3,True,,2,8,False
+akr1c1,rna,AKR1C1,True,,0,15,False
+akr1c2,rna,AKR1C2,True,,1,8,False
+akr1c3,rna,AKR1C3,True,,1,20,False
+akr1c4,rna,AKR1C4,True,,0,13,False
+akt3,rna,AKT3,True,,3,83,False
+ar,rna,AR,True,,2,23,False
+bche,rna,BCHE,True,,0,13,False
+cdk8,rna,CDK8,True,,1,34,False
+cdkn2c,rna,CDKN2C,True,,3,11,False
+cyb5a,rna,CYB5A,True,,3,6,False
+cyp11a1,rna,CYP11A1,True,,0,13,False
+cyp11b2,rna,CYP11B2,True,,1,14,False
+cyp17a1,rna,CYP17A1,True,,1,10,False
+cyp19a1,rna,CYP19A1,True,,0,13,False
+cyp21a2,rna,CYP21A2,True,,0,14,False
+cyp3a43,rna,CYP3A43,True,,0,6,False
+cyp3a5,rna,CYP3A5,True,,0,6,False
+cyp3a7,rna,CYP3A7,True,,0,5,False
+ddc,rna,DDC,True,,1,5,False
+hes6,rna,HES6,True,,1,0,False
+hsd17b1,rna,HSD17B1,True,,0,8,False
+hsd17b10,rna,HSD17B10,True,,2,11,False
+hsd17b11,rna,HSD17B11,True,,3,5,False
+hsd17b12,rna,HSD17B12,True,,0,8,False
+hsd17b13,rna,HSD17B13,True,,0,3,False
+hsd17b14,rna,HSD17B14,True,,1,5,False
+hsd17b2,rna,HSD17B2,True,,1,5,False
+hsd17b3,rna,HSD17B3,True,,0,8,False
+hsd17b4,rna,HSD17B4,True,,3,15,False
+hsd17b6,rna,HSD17B6,True,,1,3,False
+hsd17b7,rna,HSD17B7,True,,2,6,False
+hsd17b8,rna,HSD17B8,True,,0,4,False
+hsd3b1,rna,HSD3B1,True,,1,7,False
+hsd3b2,rna,HSD3B2,True,,0,7,False
+hsd3b7,rna,HSD3B7,True,,2,8,False
+mecom,rna,MECOM,True,,0,11,False
+met,rna,MET,True,,3,44,False
+ncoa2,rna,NCOA2,True,,0,54,False
+nrip1,rna,NRIP1,True,,2,18,False
+pik3r3,rna,PIK3R3,True,,4,49,False
+prkci,rna,PRKCI,True,,0,16,False
+prkd1,rna,PRKD1,True,,0,4,False
+ran,rna,RAN,True,,2,31,False
+rdh5,rna,RDH5,True,,0,12,False
+sdc4,rna,SDC4,True,,3,41,False
+serpini1,rna,SERPINI1,False,symbol not found in any configured gene-set file,0,0,False
+shbg,rna,SHBG,False,symbol not found in any configured gene-set file,0,0,False
+slc29a1,rna,SLC29A1,True,,2,7,False
+sox9,rna,SOX9,True,,2,12,False
+spry2,rna,SPRY2,True,,1,14,False
+srd5a1,rna,SRD5A1,True,,1,5,False
+srd5a2,rna,SRD5A2,True,,0,5,False
+srd5a3,rna,SRD5A3,True,,1,16,False
+st7,rna,ST7,False,symbol not found in any configured gene-set file,0,0,False
+star,rna,STAR,True,,0,7,False
+tnk2,rna,TNK2,True,,0,3,False
+tulp4,rna,TULP4,True,,0,3,False
+ugt2b15,rna,UGT2B15,True,,0,7,False
+ugt2b17,rna,UGT2B17,True,,2,7,False
+ugt2b7,rna,UGT2B7,True,,0,7,False
+pik3ca_mut,dna,PIK3CA,True,,1,137,False
+tp53_mut,dna,TP53,True,,4,129,False
+muc16_mut,dna,MUC16,True,,0,16,False
+ahnak2_mut,dna,AHNAK2,False,symbol not found in any configured gene-set file,0,0,False
+kmt2c_mut,dna,KMT2C,True,,0,26,False
+syne1_mut,dna,SYNE1,True,,1,4,False
+gata3_mut,dna,GATA3,True,,2,24,False
+map3k1_mut,dna,MAP3K1,True,,2,19,False
+ahnak_mut,dna,AHNAK,True,,1,0,False
+dnah11_mut,dna,DNAH11,False,symbol not found in any configured gene-set file,0,0,False
+cdh1_mut,dna,CDH1,True,,3,45,False
+dnah2_mut,dna,DNAH2,False,symbol not found in any configured gene-set file,0,0,False
+kmt2d_mut,dna,KMT2D,True,,1,26,False
+ush2a_mut,dna,USH2A,False,symbol not found in any configured gene-set file,0,0,False
+ryr2_mut,dna,RYR2,True,,1,6,False
+dnah5_mut,dna,DNAH5,False,symbol not found in any configured gene-set file,0,0,False
+herc2_mut,dna,HERC2,True,,0,21,False
+pde4dip_mut,dna,PDE4DIP,True,,1,0,False
+akap9_mut,dna,AKAP9,True,,0,25,False
+tg_mut,dna,TG,True,,1,0,False
+birc6_mut,dna,BIRC6,True,,0,5,False
+utrn_mut,dna,UTRN,True,,0,6,False
+tbx3_mut,dna,TBX3,True,,0,3,False
+col6a3_mut,dna,COL6A3,True,,2,17,False
+arid1a_mut,dna,ARID1A,True,,0,34,False
+lama2_mut,dna,LAMA2,True,,2,24,False
+notch1_mut,dna,NOTCH1,True,,4,62,False
+cbfb_mut,dna,CBFB,True,,0,34,False
+ncor2_mut,dna,NCOR2,True,,4,63,False
+col12a1_mut,dna,COL12A1,True,,1,7,False
+col22a1_mut,dna,COL22A1,True,,0,4,False
+pten_mut,dna,PTEN,True,,3,35,False
+akt1_mut,dna,AKT1,True,,3,113,False
+atr_mut,dna,ATR,True,,0,39,False
+thada_mut,dna,THADA,True,,0,3,False
+ncor1_mut,dna,NCOR1,True,,0,70,False
+stab2_mut,dna,STAB2,True,,0,8,False
+myh9_mut,dna,MYH9,True,,5,43,False
+runx1_mut,dna,RUNX1,True,,1,42,False
+nf1_mut,dna,NF1,True,,3,9,False
+map2k4_mut,dna,MAP2K4,True,,0,37,False
+ros1_mut,dna,ROS1,True,,1,0,False
+lamb3_mut,dna,LAMB3,True,,2,28,False
+arid1b_mut,dna,ARID1B,True,,0,24,False
+erbb2_mut,dna,ERBB2,True,,2,52,False
+sf3b1_mut,dna,SF3B1,True,,0,20,False
+shank2_mut,dna,SHANK2,True,,0,3,False
+ep300_mut,dna,EP300,True,,0,153,False
+ptprd_mut,dna,PTPRD,True,,1,4,False
+usp9x_mut,dna,USP9X,True,,0,22,False
+setd2_mut,dna,SETD2,True,,0,3,False
+setd1a_mut,dna,SETD1A,True,,0,11,False
+thsd7a_mut,dna,THSD7A,True,,0,9,False
+afdn_mut,dna,AFDN,True,,0,4,False
+erbb3_mut,dna,ERBB3,True,,2,27,False
+rb1_mut,dna,RB1,True,,2,65,False
+myo1a_mut,dna,MYO1A,False,symbol not found in any configured gene-set file,0,0,False
+alk_mut,dna,ALK,True,,0,17,False
+fanca_mut,dna,FANCA,True,,0,7,False
+adgra2_mut,dna,ADGRA2,True,,1,0,False
+ubr5_mut,dna,UBR5,False,symbol not found in any configured gene-set file,0,0,False
+pik3r1_mut,dna,PIK3R1,True,,0,156,False
+myo3a_mut,dna,MYO3A,True,,0,4,False
+asxl2_mut,dna,ASXL2,True,,0,4,False
+apc_mut,dna,APC,True,,2,31,False
+ctcf_mut,dna,CTCF,True,,2,7,False
+asxl1_mut,dna,ASXL1,True,,0,4,False
+fancd2_mut,dna,FANCD2,True,,0,7,False
+taf1_mut,dna,TAF1,True,,0,25,False
+kdm6a_mut,dna,KDM6A,True,,0,20,False
+ctnna3_mut,dna,CTNNA3,False,symbol not found in any configured gene-set file,0,0,False
+brca1_mut,dna,BRCA1,True,,4,60,False
+ptprm_mut,dna,PTPRM,True,,1,0,False
+foxo3_mut,dna,FOXO3,True,,3,39,False
+usp28_mut,dna,USP28,True,,0,4,False
+gldc_mut,dna,GLDC,True,,1,4,False
+brca2_mut,dna,BRCA2,True,,3,27,False
+cacna2d3_mut,dna,CACNA2D3,True,,0,3,False
+arid2_mut,dna,ARID2,True,,0,11,False
+aff2_mut,dna,AFF2,False,symbol not found in any configured gene-set file,0,0,False
+lifr_mut,dna,LIFR,True,,2,10,False
+sbno1_mut,dna,SBNO1,False,symbol not found in any configured gene-set file,0,0,False
+kdm3a_mut,dna,KDM3A,True,,1,7,False
+ncoa3_mut,dna,NCOA3,True,,2,21,False
+bap1_mut,dna,BAP1,True,,0,8,False
+l1cam_mut,dna,L1CAM,True,,1,10,False
+pbrm1_mut,dna,PBRM1,True,,0,11,False
+chd1_mut,dna,CHD1,True,,0,8,False
+jak1_mut,dna,JAK1,True,,1,61,False
+setdb1_mut,dna,SETDB1,True,,0,8,False
+fam20c_mut,dna,FAM20C,True,,0,4,False
+arid5b_mut,dna,ARID5B,True,,2,3,False
+egfr_mut,dna,EGFR,True,,6,74,False
+map3k10_mut,dna,MAP3K10,False,symbol not found in any configured gene-set file,0,0,False
+smarcc2_mut,dna,SMARCC2,True,,0,26,False
+erbb4_mut,dna,ERBB4,True,,0,39,False
+npnt_mut,dna,NPNT,True,,0,4,False
+nek1_mut,dna,NEK1,True,,0,4,False
+agmo_mut,dna,AGMO,True,,0,4,False
+zfp36l1_mut,dna,ZFP36L1,True,,1,3,False
+smad4_mut,dna,SMAD4,True,,0,49,False
+sik1_mut,dna,SIK1,True,,1,2,False
+casp8_mut,dna,CASP8,True,,3,59,False
+prkcq_mut,dna,PRKCQ,True,,0,36,False
+smarcc1_mut,dna,SMARCC1,True,,3,27,False
+palld_mut,dna,PALLD,True,,1,0,False
+dcaf4l2_mut,dna,DCAF4L2,False,symbol not found in any configured gene-set file,0,0,False
+bcas3_mut,dna,BCAS3,False,symbol not found in any configured gene-set file,0,0,False
+cdkn1b_mut,dna,CDKN1B,True,,6,53,False
+gps2_mut,dna,GPS2,True,,0,31,False
+men1_mut,dna,MEN1,True,,0,26,False
+stk11_mut,dna,STK11,True,,0,14,False
+sik2_mut,dna,SIK2,False,symbol not found in any configured gene-set file,0,0,False
+ptpn22_mut,dna,PTPN22,True,,0,5,False
+brip1_mut,dna,BRIP1,True,,0,34,False
+flt3_mut,dna,FLT3,True,,0,46,False
+nrg3_mut,dna,NRG3,True,,0,29,False
+fbxw7_mut,dna,FBXW7,True,,1,25,False
+ttyh1_mut,dna,TTYH1,True,,0,3,False
+taf4b_mut,dna,TAF4B,True,,0,25,False
+or6a2_mut,dna,OR6A2,True,,0,3,False
+map3k13_mut,dna,MAP3K13,False,symbol not found in any configured gene-set file,0,0,False
+hdac9_mut,dna,HDAC9,True,,2,20,False
+prkacg_mut,dna,PRKACG,True,,0,79,False
+rpgr_mut,dna,RPGR,False,symbol not found in any configured gene-set file,0,0,False
+large1_mut,dna,LARGE1,True,,3,10,False
+foxp1_mut,dna,FOXP1,True,,0,2,False
+clk3_mut,dna,CLK3,False,symbol not found in any configured gene-set file,0,0,False
+prkcz_mut,dna,PRKCZ,True,,0,19,False
+lipi_mut,dna,LIPI,True,,0,5,False
+ppp2r2a_mut,dna,PPP2R2A,True,,0,20,False
+prkce_mut,dna,PRKCE,True,,1,17,False
+gh1_mut,dna,GH1,True,,0,7,False
+gpr32_mut,dna,GPR32,True,,0,4,False
+kras_mut,dna,KRAS,True,,0,150,False
+nf2_mut,dna,NF2,True,,2,9,False
+chek2_mut,dna,CHEK2,True,,1,24,False
+ldlrap1_mut,dna,LDLRAP1,True,,1,17,False
+clrn2_mut,dna,CLRN2,False,symbol not found in any configured gene-set file,0,0,False
+acvrl1_mut,dna,ACVRL1,True,,1,3,False
+agtr2_mut,dna,AGTR2,True,,0,9,False
+cdkn2a_mut,dna,CDKN2A,True,,3,58,False
+ctnna1_mut,dna,CTNNA1,True,,1,27,False
+magea8_mut,dna,MAGEA8,False,symbol not found in any configured gene-set file,0,0,False
+prr16_mut,dna,PRR16,False,symbol not found in any configured gene-set file,0,0,False
+dtwd2_mut,dna,DTWD2,False,symbol not found in any configured gene-set file,0,0,False
+akt2_mut,dna,AKT2,True,,3,98,False
+braf_mut,dna,BRAF,True,,1,39,False
+foxo1_mut,dna,FOXO1,True,,1,27,False
+nt5e_mut,dna,NT5E,True,,3,14,False
+ccnd3_mut,dna,CCND3,True,,6,22,False
+nr3c1_mut,dna,NR3C1,True,,3,28,False
+prkg1_mut,dna,PRKG1,True,,0,17,False
+tbl1xr1_mut,dna,TBL1XR1,True,,0,63,False
+frmd3_mut,dna,FRMD3,False,symbol not found in any configured gene-set file,0,0,False
+smad2_mut,dna,SMAD2,True,,1,36,False
+sgcd_mut,dna,SGCD,True,,2,3,False
+spaca1_mut,dna,SPACA1,False,symbol not found in any configured gene-set file,0,0,False
+rasgef1b_mut,dna,RASGEF1B,False,symbol not found in any configured gene-set file,0,0,False
+hist1h2bc_mut,dna,H2BC4,True,,0,143,True
+nr2f1_mut,dna,NR2F1,True,,0,4,False
+klrg1_mut,dna,KLRG1,True,,0,3,False
+mbl2_mut,dna,MBL2,True,,3,16,False
+mtap_mut,dna,MTAP,True,,0,10,False
+ppp2cb_mut,dna,PPP2CB,True,,2,126,False
+smarcd1_mut,dna,SMARCD1,True,,0,27,False
+nras_mut,dna,NRAS,True,,0,141,False
+ndfip1_mut,dna,NDFIP1,False,symbol not found in any configured gene-set file,0,0,False
+hras_mut,dna,HRAS,True,,4,142,False
+prps2_mut,dna,PRPS2,True,,1,4,False
+smarcb1_mut,dna,SMARCB1,True,,0,26,False
+stmn2_mut,dna,STMN2,True,,0,5,False
+siah1_mut,dna,SIAH1,True,,1,10,False
