@@ -71,6 +71,44 @@ def _register_holdout_copy(st, h, merges=None):
              "Strata merged before the holdout split (empty = none)")
 
 
+def cmd_splits(args) -> str:
+    from .splits import load_cv_splits, make_cv_splits, training_ids
+    cfg = load_config()
+    full = load_dataset(cfg)
+    tr = training_ids(cfg, full)                        # verifies the holdout hash
+    cfg, sp, merges = make_cv_splits(cfg, full.subset(tr))   # refuses if they already exist
+    run = Run(cfg, "splits")
+    st = run.stage("splits")
+    try:
+        run.record_input(cfg.path("data"), "dataset")
+        run.record_input(cfg.path("holdout"), "frozen holdout (training rows only are split)")
+        load_cv_splits(cfg, tr)
+        run.record_external(cfg.path("cv_splits"), "frozen CV splits (created by this run)", "metabric.splits.make_cv_splits")
+        sizes = (sp.groupby(["split_id", "role"]).size().unstack().reset_index())
+        st.table("cv_split_sizes", sizes, "Rows per split: outer train and test sizes")
+        st.table("cv_strata_merges", merges, "Strata merged before outer/inner splitting (empty = none)")
+        st.log.info("CV splits created: %d splits, sha256 %s; merges: %d", sp.split_id.nunique(),
+                    cfg["cv"]["splits_sha256"], len(merges))
+        run.finalize()
+    except BaseException as exc:
+        run.fail(exc)
+        raise
+    return run.run_id
+
+
+def cmd_harness(args) -> str:
+    from .harness_stage import run_harness
+    cfg = load_config()
+    run = Run(cfg, "harness")
+    try:
+        run_harness(cfg, run)
+        run.finalize()
+    except BaseException as exc:
+        run.fail(exc)
+        raise
+    return run.run_id
+
+
 def cmd_eda(args) -> str:
     from .eda import run_eda
     cfg = load_config()
@@ -91,10 +129,13 @@ def main(argv=None) -> int:
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("crosswalk", help="build reference/crosswalk/ from the configured gene-set files")
     sub.add_parser("holdout", help="create the frozen 20%% holdout (once only)")
+    sub.add_parser("splits", help="create the frozen nested CV splits on the training rows (once only)")
+    sub.add_parser("harness", help="run the floors through the evaluation harness")
     e = sub.add_parser("eda", help="rerunnable EDA stage")
     e.add_argument("--mode", choices=["descriptive", "modelling", "both"], default="both")
     args = p.parse_args(argv)
-    rid = {"crosswalk": cmd_crosswalk, "holdout": cmd_holdout, "eda": cmd_eda}[args.cmd](args)
+    rid = {"crosswalk": cmd_crosswalk, "holdout": cmd_holdout, "splits": cmd_splits, "harness": cmd_harness,
+           "eda": cmd_eda}[args.cmd](args)
     print(f"run complete: outputs/{rid}")
     return 0
 

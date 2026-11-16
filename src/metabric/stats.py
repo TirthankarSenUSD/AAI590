@@ -117,6 +117,27 @@ def kaplan_meier(time, event) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def corrected_resampled_ttest(diffs, n_train: int, n_test: int) -> dict:
+    """Nadeau & Bengio (2003) corrected resampled t-test for paired per-fold differences.
+
+    Variance is inflated by (1/J + n_test/n_train) instead of 1/J because the training sets of
+    the J folds/repeats overlap. Returns mean, corrected SE, t, two-sided p and a 95% CI.
+    """
+    d = np.asarray(diffs, dtype=float)
+    J = len(d)
+    mean = float(d.mean())
+    s2 = float(d.var(ddof=1)) if J > 1 else float("nan")
+    se = float(np.sqrt((1 / J + n_test / n_train) * s2)) if J > 1 else float("nan")
+    if se == 0 or np.isnan(se):
+        t, p = (float("nan"), 1.0) if mean == 0 or np.isnan(se) else (float("inf"), 0.0)
+        half = 0.0 if se == 0 else float("nan")
+    else:
+        t = mean / se
+        p = float(2 * stats.t.sf(abs(t), df=J - 1))
+        half = float(stats.t.ppf(0.975, df=J - 1) * se)
+    return {"mean_diff": mean, "se_corrected": se, "t": t, "p": p, "ci_low": mean - half, "ci_high": mean + half, "J": J}
+
+
 def smd(a, b) -> float:
     a, b = np.asarray(a, float), np.asarray(b, float)
     a, b = a[~np.isnan(a)], b[~np.isnan(b)]

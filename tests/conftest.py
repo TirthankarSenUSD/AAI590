@@ -29,7 +29,7 @@ def tmp_project(tmp_path, cfg) -> Config:
     raw["holdout"] = dict(raw["holdout"], sha256=None)
     text = (ROOT / "config.yaml").read_text(encoding="utf-8")
     import re
-    text = re.sub(r'(\n\s+sha256:\s*)"[0-9a-f]+"', r"\1null", text)
+    text = re.sub(r'(\n\s+(?:splits_)?sha256:\s*)"[0-9a-f]+"', r"\1null", text)
     (root / "config.yaml").write_text(text, encoding="utf-8")
     (root / "CLAUDE.md").write_text("marker", encoding="utf-8")
     (root / "data").mkdir()

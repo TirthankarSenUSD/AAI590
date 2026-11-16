@@ -52,16 +52,21 @@ def load_config(root: str | Path | None = None) -> Config:
     return Config(root=root, raw=raw)
 
 
-_SHA_LINE = re.compile(r"^(\s+sha256:\s*)null(.*)$", re.M)
+def write_frozen_hash(cfg: Config, section: str, field_name: str, sha: str) -> Config:
+    """Record a frozen file's hash in config.yaml once (a targeted edit that keeps comments)."""
+    if cfg.raw[section].get(field_name):
+        raise RuntimeError(f"config.yaml already holds {section}.{field_name}; the file is frozen")
+    text = cfg.file.read_text(encoding="utf-8")
+    pattern = re.compile(rf"^(\s+{re.escape(field_name)}:\s*)null(.*)$", re.M)
+    new, n = pattern.subn(lambda m: f'{m.group(1)}"{sha}"{m.group(2)}', text, count=1)
+    if n != 1:
+        raise RuntimeError(f"could not find '{field_name}: null' in config.yaml")
+    cfg.file.write_text(new, encoding="utf-8", newline="\n")
+    out = load_config(cfg.root)
+    if out.raw[section].get(field_name) != sha:
+        raise RuntimeError(f"hash written to the wrong place for {section}.{field_name}")
+    return out
 
 
 def write_holdout_hash(cfg: Config, sha: str) -> Config:
-    """Record the holdout file hash in config.yaml once (a targeted edit that keeps comments)."""
-    text = cfg.file.read_text(encoding="utf-8")
-    if cfg.raw["holdout"].get("sha256"):
-        raise RuntimeError("config.yaml already holds a holdout hash; the holdout is frozen")
-    new, n = _SHA_LINE.subn(lambda m: f'{m.group(1)}"{sha}"{m.group(2)}', text, count=1)
-    if n != 1:
-        raise RuntimeError("could not find 'sha256: null' under holdout in config.yaml")
-    cfg.file.write_text(new, encoding="utf-8", newline="\n")
-    return load_config(cfg.root)
+    return write_frozen_hash(cfg, "holdout", "sha256", sha)

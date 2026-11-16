@@ -12,8 +12,9 @@ A reproducible machine-learning pipeline that predicts overall survival in breas
 | 1 | Data layer, configuration, artifact writer and manifest | done |
 | 1a | Gene crosswalk between dataset columns and gene-set files | done |
 | 1b | Rerunnable exploratory data analysis (EDA) | done |
-| 2 | Evaluation harness (nested cross-validation, baselines) | next |
-| 3–7 | Model farm, importance, ensemble, model-agreement analysis, report | planned |
+| 2 | Evaluation harness (nested cross-validation, baselines) | done |
+| 3 | Model farm | next |
+| 4–7 | Importance, ensemble, model-agreement analysis, report | planned |
 
 ## Design principles
 
@@ -59,8 +60,10 @@ Run from the repository root:
 ```bash
 python run.py crosswalk          # build reference/crosswalk/ from the gene-set files
 python run.py holdout            # create the frozen holdout (once only; refuses if it exists)
+python run.py splits             # create the frozen nested CV splits (once only; refuses if they exist)
 python run.py eda --mode both    # EDA: descriptive (all patients) and modelling (training rows only)
-python -m pytest -q              # run the test suite (about 75 s)
+python run.py harness            # baselines ("floors") through the nested cross-validation
+python -m pytest -q              # run the test suite (about 70 s)
 ```
 
 Each command creates `outputs/<timestamp>_<config hash>/` containing a copy of the config, `manifest.json` and `<stage>/{figures,tables,logs}`. `outputs/latest.json` points at the newest completed run. Every figure is a PNG with a CSV of the plotted numbers and a caption in the manifest.
@@ -71,6 +74,27 @@ Each command creates `outputs/<timestamp>_<config hash>/` containing a copy of t
 - `modelling` uses the 1,523 training rows only and also checks holdout balance.
 
 Each mode writes a generated summary (`eda/tables/<mode>__eda_summary.md`). The descriptive run is checked against 50 reference values (`descriptive__reference_check.csv`).
+
+### Evaluation harness
+
+All models are scored on the same frozen nested cross-validation: 5 outer folds × 2 repeats on the 1,523 training patients, with 3 inner folds inside each outer training set.
+- **Inner folds** make every choice: model selection (simplest model within one standard error of the best), the operating-point threshold, and recalibration.
+- **Outer folds** report the score.
+- **Comparisons** between models are paired and use the corrected resampled t-test.
+- **Checks:**
+  - a label-permutation test, which must score at chance;
+  - leave-one-cohort-out;
+  - results within treatment subgroups;
+  - an overfit gate (train-versus-CV gap, calibration slope).
+
+Baselines on the training rows (mean outer-fold AUROC, 95% CI):
+
+| Baseline | AUROC |
+|---|---|
+| Majority class | 0.500 |
+| Age only | 0.685 (0.653–0.718) |
+| NPI as supplied | 0.596 (0.569–0.623) |
+| Standard NPI | 0.616 (0.586–0.645) |
 
 ## Data and gene sets
 

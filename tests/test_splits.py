@@ -38,6 +38,29 @@ def test_make_holdout_once_and_frozen(tmp_project):
         load_holdout(cfg2, ds)
 
 
+def test_make_cv_splits_frozen_nested_and_clean(tmp_project):
+    from metabric.harness import check_split_hygiene, splits_from_table
+    from metabric.splits import load_cv_splits, make_cv_splits, training_ids
+    ds = load_dataset(tmp_project)
+    cfg2, _, _ = make_holdout(tmp_project, ds)
+    tr = training_ids(cfg2, ds)
+    cfg3, sp, merges = make_cv_splits(cfg2, ds.subset(tr))
+    assert cfg3["cv"]["splits_sha256"] and cfg3["holdout"]["sha256"] == cfg2["holdout"]["sha256"]
+    s = load_cv_splits(cfg3, tr)
+    assert s.split_id.nunique() == 10 and not set(s.patient_id) & set(ds.ids.difference(tr))   # no holdout rows
+    check_split_hygiene(splits_from_table(s), tr)
+    assert merges.empty                                            # smallest training stratum (11) >= 5 folds
+    test = s[s.role == "test"]
+    rates = test.assign(y=ds.y.loc[test.patient_id].to_numpy()).groupby("split_id").y.mean()
+    assert (rates - ds.y.loc[tr].mean()).abs().max() < 0.02        # outcome stratified
+    with pytest.raises(HoldoutError):
+        make_cv_splits(cfg3, ds.subset(tr))
+    p = cfg3.path("cv_splits")
+    p.write_text(p.read_text().replace(",test,", ",train,", 1))
+    with pytest.raises(HoldoutError):
+        load_cv_splits(cfg3, tr)
+
+
 def test_real_holdout_is_frozen_and_valid(cfg, ds):
     h = load_holdout(cfg, ds)                  # verifies hash against config
     assert (h["set"] == "holdout").sum() == 381

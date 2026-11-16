@@ -156,8 +156,72 @@ def split_diagnostics(ctx: Ctx, full: Dataset, hold: pd.DataFrame, run: Run) -> 
     ax.legend(loc="lower right")
     P.grid(ax, "x")
     ctx.figure("split_balance", fig, b, "Share of patients per variable level in training rows and the frozen holdout")
-    if ctx.facts["n_balance_fail"]:
+    fold_fail = _fold_balance(ctx, full, hold, run, rule)
+    if ctx.facts["n_balance_fail"] or fold_fail:
         raise RuntimeError(f"split balance rule broken:\n{bal[bal.status == 'fail'].to_string(index=False)}")
+
+
+def _fold_balance(ctx: Ctx, full: Dataset, hold: pd.DataFrame, run: Run, rule: dict) -> int:
+    """Item 10, outer folds: test part against training part of every frozen split (training rows only)."""
+    if not ctx.cfg["cv"].get("splits_sha256"):
+        ctx.facts["cv_splits_present"] = False
+        ctx.log.info("no frozen CV splits yet: fold balance skipped")
+        return 0
+    from ..splits import load_cv_splits
+    tr_ids = pd.Index(hold.loc[hold["set"] == "train", "patient_id"])
+    sp = load_cv_splits(ctx.cfg, tr_ids)
+    if not ctx.cfg.raw["paths"]["cv_splits"] in {e["path"] for e in run.manifest["inputs"]}:
+        run.record_input(ctx.cfg.path("cv_splits"), "frozen CV splits (read-only)")
+    f, y = full.frame.loc[tr_ids], full.y.loc[tr_ids]
+    vars_ = {"death": (y == 1, True), "chemotherapy": (f["chemotherapy"] == 1, True),
+             "hormone_therapy": (f["hormone_therapy"] == 1, False), "radio_therapy": (f["radio_therapy"] == 1, False),
+             "mastectomy": (f["type_of_breast_surgery"] == "MASTECTOMY", False),
+             "tumor_stage_missing": (f["tumor_stage"].isna(), False)}
+    for c in sorted(f["cohort"].astype(str).unique()):
+        vars_[f"cohort_{c}"] = (f["cohort"].astype(str) == c, True)
+    rows = []
+    for sid, g in sp.groupby("split_id", sort=False):
+        te = pd.Index(g.loc[g.role == "test", "patient_id"])
+        trn = pd.Index(g.loc[g.role == "train", "patient_id"])
+        for v, (x, strat) in vars_.items():
+            p1, p2 = float(x.loc[trn].mean()), float(x.loc[te].mean())
+            sd = np.sqrt((p1 * (1 - p1) + p2 * (1 - p2)) / 2)
+            smd = (p2 - p1) / sd if sd > 0 else 0.0
+            status = ("fail" if abs(p2 - p1) > rule["max_abs_diff_stratified"] else "ok") if strat else \
+                     ("warn" if abs(smd) > rule["warn_smd"] else "ok")
+            rows.append({"split_id": sid, "variable": v, "train": p1, "test": p2, "diff": p2 - p1, "smd": smd,
+                         "stratified": strat, "status": status})
+        a1, a2 = f.loc[trn, "age_at_diagnosis"], f.loc[te, "age_at_diagnosis"]
+        from ..stats import smd as _smd
+        s = _smd(a2, a1)
+        rows.append({"split_id": sid, "variable": "age_mean", "train": a1.mean(), "test": a2.mean(), "diff": a2.mean() - a1.mean(),
+                     "smd": s, "stratified": False, "status": "warn" if abs(s) > rule["warn_smd"] else "ok"})
+    fb = pd.DataFrame(rows)
+    ctx.table("split_fold_balance", fb, "Outer-fold balance: test part against training part of every frozen split; "
+              "stratified variables fail above the configured absolute difference, others warn above |SMD|")
+    strat = fb[fb.stratified]
+    ctx.facts.update(cv_splits_present=True, n_cv_splits=int(sp.split_id.nunique()),
+                     n_fold_balance_fail=int((fb.status == "fail").sum()), n_fold_balance_warn=int((fb.status == "warn").sum()),
+                     max_fold_abs_diff_stratified=round(float(strat["diff"].abs().max()), 4),
+                     max_fold_abs_smd_other=round(float(fb[~fb.stratified]["smd"].abs().max()), 4),
+                     fold_warnings=fb[fb.status == "warn"][["split_id", "variable", "smd"]].round(3).to_dict("records"))
+    piv = fb.pivot(index="variable", columns="split_id", values="smd")
+    fig, ax = P.fig(7.5, 0.33 * len(piv) + 1.4)
+    lim = max(0.2, float(np.abs(piv.to_numpy()).max()))
+    im = ax.imshow(piv.to_numpy(), cmap=P.DIV, vmin=-lim, vmax=lim, aspect="auto")
+    ax.set_xticks(range(piv.shape[1]))
+    ax.set_xticklabels(piv.columns, fontsize=7)
+    ax.set_yticks(range(piv.shape[0]))
+    ax.set_yticklabels(piv.index, fontsize=7)
+    for i in range(piv.shape[0]):
+        for j in range(piv.shape[1]):
+            v = piv.iat[i, j]
+            ax.text(j, i, f"{v:+.2f}", ha="center", va="center", fontsize=6, color="white" if abs(v) > 0.6 * lim else P.INK)
+    fig.colorbar(im, ax=ax, shrink=0.8, label="SMD (test - train)")
+    ax.spines[:].set_visible(False)
+    ax.set_title("Balance of every frozen outer split (SMD)")
+    ctx.figure("split_fold_balance", fig, piv.reset_index(), "Standardised mean difference, test minus training part, per variable and frozen split")
+    return ctx.facts["n_fold_balance_fail"]
 
 
 def reference_check(ctx: Ctx) -> pd.DataFrame:
@@ -267,5 +331,10 @@ def summary(ctx: Ctx, run: Run) -> str:
         L += ["## Split balance",
               f"- {F['n_train']} training and {F['n_holdout']} holdout patients. Largest difference on a stratified variable: "
               f"{F['max_abs_diff_stratified']:.3f}; {F['n_balance_fail']} failures, {F['n_balance_warn']} warnings "
-              f"(largest |SMD| on other variables {F['max_abs_smd_other']:.3f}).", ""]
+              f"(largest |SMD| on other variables {F['max_abs_smd_other']:.3f}).",
+              (f"- Frozen CV splits ({F['n_cv_splits']}): largest test-versus-train difference on a stratified variable "
+               f"{F['max_fold_abs_diff_stratified']:.3f}; {F['n_fold_balance_fail']} failures, {F['n_fold_balance_warn']} warnings "
+               f"(largest |SMD| on other variables {F['max_fold_abs_smd_other']:.3f}"
+               + (": " + "; ".join(f"{w['split_id']} {w['variable']} {w['smd']:+.2f}" for w in F['fold_warnings']) if F['fold_warnings'] else "")
+               + ")." if F.get("cv_splits_present") else "- CV splits not created yet: fold balance not checked."), ""]
     return "\n".join(L)

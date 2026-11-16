@@ -19,14 +19,17 @@ def eda_run(tmp_path_factory, cfg):
     import yaml
     from metabric.config import Config
     root = tmp_path_factory.mktemp("edaproj")
-    text = re.sub(r'(\n\s+sha256:\s*)"[0-9a-f]+"', r"\1null", (cfg.root / "config.yaml").read_text(encoding="utf-8"))
+    text = re.sub(r'(\n\s+(?:splits_)?sha256:\s*)"[0-9a-f]+"', r"\1null", (cfg.root / "config.yaml").read_text(encoding="utf-8"))
     text = text.replace("permutations: 1000", "permutations: 200")   # faster; reference values do not depend on it
     (root / "config.yaml").write_text(text, encoding="utf-8")
     (root / "CLAUDE.md").write_text("marker", encoding="utf-8")
     (root / "data").mkdir()
     shutil.copyfile(cfg.path("data"), root / "data" / Path(cfg.raw["paths"]["data"]).name)
     c = Config(root=root, raw=yaml.safe_load(text))
-    c, _, _ = make_holdout(c, load_dataset(c))
+    full = load_dataset(c)
+    c, _, _ = make_holdout(c, full)
+    from metabric.splits import make_cv_splits, training_ids
+    c, _, _ = make_cv_splits(c, full.subset(training_ids(c, full)))
     run = Run(c, "test eda", run_id="eda_test")
     facts_d = run_eda(c, run, "descriptive")
     facts_m = run_eda(c, run, "modelling")
@@ -43,6 +46,7 @@ def test_modelling_mode_uses_training_rows_only(eda_run):
     _, _, fm = eda_run
     assert fm["n_patients"] == 1523 and fm["n_train"] == 1523 and fm["n_holdout"] == 381
     assert fm["n_balance_fail"] == 0
+    assert fm["cv_splits_present"] and fm["n_cv_splits"] == 10 and fm["n_fold_balance_fail"] == 0
 
 
 def test_every_figure_has_csv_and_caption(eda_run):
