@@ -99,7 +99,9 @@ def rna_transformer(rep: dict, kind: str, cfg, seed: int, rna_scale: float | Non
 
 def preprocessor(groups: dict, kind: str, rep: dict | None, cfg, seed: int, rna_scale: float | None = None):
     """kind 'linear': median fill + missing flags + scaling, one-hot categories (A1, A12).
-    kind 'tree': numbers passed with gaps (native handling), categories as ordinal codes."""
+    kind 'tree': numbers passed with gaps (native handling), categories as ordinal codes.
+    kind 'embed': as 'linear' for numbers and RNA, but categories as integer codes placed last
+    (for learned embeddings; 0 = a level never seen in the fitting rows)."""
     rare = cfg["farm"]["rare_level_min_count"]
     parts = []
     if kind == "linear":
@@ -110,6 +112,22 @@ def preprocessor(groups: dict, kind: str, rep: dict | None, cfg, seed: int, rna_
             parts.append(("cat", make_pipeline(CategoricalAsString(),
                                                OneHotEncoder(handle_unknown="infrequent_if_exist", min_frequency=rare,
                                                              sparse_output=False)), groups["categorical"]))
+    elif kind == "embed":
+        # dense part first (as for linear members), integer category codes last for the embeddings
+        if groups["numeric"]:
+            parts.append(("num", make_pipeline(SimpleImputer(strategy="median", add_indicator=True), StandardScaler()),
+                          groups["numeric"]))
+        if groups["binary"]:
+            parts.append(("bin", "passthrough", groups["binary"]))
+        if groups["rna"]:
+            parts.append(("rna", rna_transformer(rep or {}, "linear", cfg, seed, rna_scale), groups["rna"]))
+        if groups["categorical"]:
+            parts.append(("cat", make_pipeline(CategoricalAsString(),
+                                               OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1,
+                                                              min_frequency=rare),
+                                               FunctionTransformer(lambda Z: Z + 1, feature_names_out="one-to-one")),
+                          groups["categorical"]))              # 0 = unseen level
+        return ColumnTransformer(parts, remainder="drop", verbose_feature_names_out=False)
     else:
         if groups["numeric"]:
             parts.append(("num", "passthrough", groups["numeric"]))
@@ -119,6 +137,6 @@ def preprocessor(groups: dict, kind: str, rep: dict | None, cfg, seed: int, rna_
                                                               min_frequency=rare)), groups["categorical"]))
     if groups["binary"]:
         parts.append(("bin", "passthrough", groups["binary"]))
-    if groups["rna"]:
+    if groups["rna"]:                                      # RNA last (the multimodal member relies on this)
         parts.append(("rna", rna_transformer(rep or {}, kind, cfg, seed, rna_scale), groups["rna"]))
     return ColumnTransformer(parts, remainder="drop", verbose_feature_names_out=False)

@@ -13,8 +13,11 @@ from sklearn.svm import SVC
 from ..harness import Candidate
 from .preprocess import column_groups, preprocessor
 
-FAMILY = {"logreg_en": 1, "svm_rbf": 2, "random_forest": 3, "xgboost": 3}   # simpler first
-KIND = {"logreg_en": "linear", "svm_rbf": "linear", "random_forest": "tree", "xgboost": "tree"}
+FAMILY = {"logreg_en": 1, "svm_rbf": 2, "random_forest": 3, "xgboost": 3,       # simpler first
+          "mlp": 4, "mlp_embed": 4, "multimodal": 5}
+KIND = {"logreg_en": "linear", "svm_rbf": "linear", "random_forest": "tree", "xgboost": "tree",
+        "mlp": "linear", "mlp_embed": "embed", "multimodal": "linear"}
+NEURAL = {"mlp", "mlp_embed", "multimodal"}
 
 
 @dataclass(frozen=True)
@@ -31,7 +34,15 @@ def resolve_n_jobs(cfg) -> int:
     return max(1, (os.cpu_count() or 2) - 1) if n == "auto" else int(n)
 
 
-def _estimator(member: str, p: dict, seed: int):
+def _estimator(member: str, p: dict, seed: int, groups: dict | None = None, nn: dict | None = None):
+    if member in NEURAL:
+        from .neural import TorchEmbedMLP, TorchMLP, TorchMultimodal
+        common = dict(weight_decay=p["weight_decay"], dropout=p["dropout"], random_state=seed, **(nn or {}))
+        if member == "mlp":
+            return TorchMLP(hidden=tuple(p["hidden"]), **common)
+        if member == "mlp_embed":
+            return TorchEmbedMLP(n_cat=len(groups["categorical"]), hidden=tuple(p["hidden"]), **common)
+        return TorchMultimodal(n_rna=len(groups["rna"]), block_dropout=p["block_dropout"], **common)
     if member == "logreg_en":
         return LogisticRegression(C=p["C"], l1_ratio=p["l1_ratio"], solver="saga", max_iter=3000, tol=1e-3,
                                   random_state=seed)
@@ -60,6 +71,10 @@ def _hyper_complexity(member: str, p: dict, grid: dict) -> float:
         return 0.5 * (1 - idx("min_samples_leaf") - 1 / len(grid["min_samples_leaf"]))
     if member == "xgboost":
         return 0.5 * idx("max_depth") + 0.1 * idx("colsample_bytree")
+    if member in ("mlp", "mlp_embed"):
+        return 0.5 * idx("hidden") + 0.1 * (1 - idx("dropout") - 1 / len(grid["dropout"]))
+    if member == "multimodal":
+        return 0.5 * (1 - idx("block_dropout") - 1 / len(grid["block_dropout"]))
     return 0.0
 
 
@@ -75,10 +90,18 @@ def build_candidates(cfg, members=None, arms=None) -> tuple[list[Candidate], dic
     for arm in arms:
         groups = column_groups(cfg, arm)
         cols = groups["numeric"] + groups["binary"] + groups["categorical"] + groups["rna"]
-        reps = fc["rna_representations"] if groups["rna"] else {"none": {}}
+        all_reps = fc["rna_representations"] if groups["rna"] else {"none": {}}
         for member in members:
+            if member == "multimodal" and not groups["rna"]:
+                continue                                   # needs at least two data blocks
             grid = fc["grids"][member]
             keys = list(grid)
+            if member == "multimodal":
+                reps = {"all": {}}                         # one encoder over the full RNA block
+            elif member in NEURAL and groups["rna"]:
+                reps = {k: all_reps[k] for k in fc["neural_rna_representations"]}
+            else:
+                reps = all_reps
             for rep_name, rep in reps.items():
                 for values in itertools.product(*(grid[k] for k in keys)):
                     p = dict(zip(keys, values))
@@ -88,7 +111,7 @@ def build_candidates(cfg, members=None, arms=None) -> tuple[list[Candidate], dic
 
                     def make(member=member, p=p, rep=rep, groups=groups, scale=scale):
                         return make_pipeline(preprocessor(groups, KIND[member], rep, cfg, seed, scale),
-                                             _estimator(member, p, seed))
+                                             _estimator(member, p, seed, groups, fc.get("neural")))
 
                     complexity = FAMILY[member] * 1000 + _rna_inputs(rep, len(groups["rna"])) + _hyper_complexity(member, p, grid)
                     cands.append(Candidate(name, make, cols, complexity, True, f"{member} on {arm} ({rep_name}; {pstr})"))

@@ -68,7 +68,7 @@ def test_linear_preprocessing_is_one_hot_and_fitted_on_training_rows_only(cfg, d
 def test_candidate_grid_counts(cfg):
     cands, meta = build_candidates(cfg)
     by_arm = pd.Series([m.arm for m in meta.values()]).value_counts().to_dict()
-    assert by_arm == {"C+RNA": 120, "C": 20, "strict_clinical": 20}
+    assert by_arm == {"C+RNA": 130, "C": 24, "strict_clinical": 24}     # 3a classical + 3b neural
     assert len({c.name for c in cands}) == len(cands)
     lr = [c for c in cands if meta[c.name].member == "logreg_en"]
     xgb = [c for c in cands if meta[c.name].member == "xgboost"]
@@ -85,3 +85,27 @@ def test_real_logreg_on_clinical_runs(cfg, ds):
     r = H.evaluate(cands[:2], select=True, n_jobs=2)
     assert r.selection.winner.isin([c.name for c in cands[:2]]).all()
     assert 0.6 < r.selection.outer_auroc.mean() < 0.85
+
+
+def test_run_farm_end_to_end_small(tmp_project):
+    """The whole farm stage on a tiny grid, including a member that exists on only one arm."""
+    from metabric.core.artifacts import Run
+    from metabric.data import load_dataset
+    from metabric.farm.stage import run_farm
+    from metabric.splits import make_cv_splits, make_holdout, training_ids
+    ds = load_dataset(tmp_project)
+    c, _, _ = make_holdout(tmp_project, ds)
+    c, _, _ = make_cv_splits(c, ds.subset(training_ids(c, ds)))
+    f = c.raw["farm"]
+    f.update(n_jobs=2, n_permutations=2, rna_representations={"pca10": {"pca": 10}}, neural_rna_representations=["pca10"],
+             grids={"logreg_en": {"C": [0.1], "l1_ratio": [0.0]},
+                    "mlp": {"hidden": [[8]], "dropout": [0.3], "weight_decay": [0.001]},
+                    "multimodal": {"block_dropout": [0.1], "dropout": [0.3], "weight_decay": [0.001]}},
+             neural={**f["neural"], "max_epochs": 3, "n_seeds": 1})
+    c.raw["harness"].update(n_boot=10, chance_band=0.5)        # 2 shuffles: only the plumbing is tested here
+    run = Run(c, "test farm", run_id="farm_test")
+    facts = run_farm(c, run, members=["logreg_en", "mlp", "multimodal"], arms=["C", "C+RNA"])
+    run.finalize()
+    assert "C|multimodal" not in facts and "C+RNA|multimodal" in facts and "C+RNA|best" in facts
+    assert facts["permutation"]["n_permutations"] == 2
+    assert (run.dir / "farm" / "tables" / "farm_summary.md").is_file()

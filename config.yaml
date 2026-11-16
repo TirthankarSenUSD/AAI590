@@ -53,7 +53,8 @@ harness:
 # Model farm (step 3). Small grids for the first pass; raise later without code changes.
 farm:
   n_jobs: auto                      # auto = logical cores - 1 (at least 1); or an integer
-  members: [logreg_en, svm_rbf, random_forest, xgboost]      # 3a; 3b adds the three neural members
+  members: [logreg_en, svm_rbf, random_forest, xgboost, mlp, mlp_embed, multimodal]   # 3a classical + 3b neural
+  n_permutations: 10                # permutation test of the full C|best procedure (all members); low budget (F-043)
   arms:
     C: {blocks: [clinical]}
     C+RNA: {blocks: [clinical, rna]}
@@ -79,6 +80,17 @@ farm:
     random_forest: {n_estimators: [300], max_features: [sqrt, 0.2], min_samples_leaf: [5, 20]}
     xgboost: {n_estimators: [300], learning_rate: [0.05], max_depth: [2, 4], subsample: [0.8],
               colsample_bytree: [0.5, 0.8], min_child_weight: [5]}
+    mlp: {hidden: [[32], [64, 32]], dropout: [0.3], weight_decay: [0.001]}
+    mlp_embed: {hidden: [[32], [64, 32]], dropout: [0.3], weight_decay: [0.001]}
+    multimodal: {block_dropout: [0.1, 0.3], dropout: [0.3], weight_decay: [0.001]}
+  neural_rna_representations: [all, pca10]      # mlp / mlp_embed on C+RNA (multimodal always uses all genes)
+  neural:                                       # shared training settings for the three neural members
+    lr: 0.001
+    max_epochs: 200
+    patience: 15                    # early stopping on a stratified 15% validation split of the fitting rows
+    batch_size: 128
+    val_fraction: 0.15
+    n_seeds: 2                      # predictions averaged over seeds
 
 # Floors: always reported, never eligible to win (CLAUDE.md section 5). Built in step 2.
 floors:

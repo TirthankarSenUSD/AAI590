@@ -59,7 +59,8 @@ def run_farm(cfg: Config, run: Run, members=None, arms=None) -> dict:
     for arm in arms:
         for member in members:
             names = [n for n, m in meta.items() if m.arm == arm and m.member == member]
-            procs[f"{arm}|{member}"] = names
+            if names:                                  # e.g. multimodal exists only on multi-block arms
+                procs[f"{arm}|{member}"] = names
         procs[f"{arm}|best"] = [n for n, m in meta.items() if m.arm == arm]
     pf_parts, pred_parts = [], []
     for pname, names in procs.items():
@@ -101,9 +102,9 @@ def run_farm(cfg: Config, run: Run, members=None, arms=None) -> dict:
     for pname in procs:
         pair(pname, "age_only", "procedure vs age-only floor")
     for m in members + ["best"]:
-        if "C+RNA" in arms and "C" in arms:
+        if f"C+RNA|{m}" in procs and f"C|{m}" in procs:
             pair(f"C+RNA|{m}", f"C|{m}", "adding RNA (C+RNA vs C)")
-        if "strict_clinical" in arms and "C" in arms:
+        if f"strict_clinical|{m}" in procs and f"C|{m}" in procs:
             pair(f"strict_clinical|{m}", f"C|{m}", "dropping molecular-derived clinical columns (strict vs C)")
     pair_t = pd.concat(pairs, ignore_index=True)
     st.table("paired_comparisons", pair_t, "Paired differences a - b on identical splits, corrected resampled t-test")
@@ -123,7 +124,7 @@ def run_farm(cfg: Config, run: Run, members=None, arms=None) -> dict:
         r = H.evaluate(perm_cands, y=y, select=True, light=True, n_jobs=n_jobs)
         return float(r.selection.outer_auroc.mean())
     t1 = time.time()
-    perm, perm_s = H.permutation_test(proc_fn, cfg["harness"]["n_permutations"], rng)
+    perm, perm_s = H.permutation_test(proc_fn, cfg["farm"].get("n_permutations", cfg["harness"]["n_permutations"]), rng)
     st.log.info("permutation test (%s|best, %d shuffles) in %.0f s", perm_arm, len(perm), time.time() - t1)
     st.table("permutation_test", perm, f"Label-permutation test of the full {perm_arm}|best procedure (selection inside every outer fold)")
     st.table("permutation_summary", pd.DataFrame([{**perm_s, "procedure": f"{perm_arm}|best"}]), "Permutation test summary (must be at chance)")
@@ -153,7 +154,7 @@ def _figures(st, summ, sel_all, rel, arms, members):
     ax.set_yticks(y)
     ax.set_yticklabels(order, fontsize=8)
     ax.set_xlabel("Outer-fold AUROC of the select-the-best procedure (95% corrected CI)")
-    ax.set_title("Model farm (3a): procedures by arm and member")
+    ax.set_title("Model farm: procedures by arm and member")
     P.grid(ax, "x")
     st.figure("farm_procedure_auroc", fig, a.loc[order + ["age_only"]].reset_index(),
               "Outer-fold AUROC of each select-the-best procedure (diamond = best member chosen inside the fold); dashed = age-only floor")
@@ -186,7 +187,7 @@ def _figures(st, summ, sel_all, rel, arms, members):
 def _facts(summ, pairs, gate, stab, perm, perm_arm, arms, members, n_cands, n_jobs, secs) -> dict:
     g = lambda c, m, k="mean": float(summ[(summ.candidate == c) & (summ.metric == m)][k].iloc[0])  # noqa: E731
     F = {"n_configurations": n_cands, "n_jobs": n_jobs, "seconds": round(secs), "floor_age": round(g("age_only", "auroc"), 4)}
-    for p in [f"{a}|{m}" for a in arms for m in members + ["best"]]:
+    for p in [f"{a}|{m}" for a in arms for m in members + ["best"] if (summ.candidate == f"{a}|{m}").any()]:
         F[p] = {"auroc": round(g(p, "auroc"), 4), "ci": [round(g(p, "auroc", "ci_low"), 4), round(g(p, "auroc", "ci_high"), 4)],
                 "cal_slope": round(g(p, "cal_slope"), 3), "brier_skill": round(g(p, "brier_skill"), 4),
                 "optimism": round(g(p, "optimism"), 4)}
@@ -199,7 +200,7 @@ def _facts(summ, pairs, gate, stab, perm, perm_arm, arms, members, n_cands, n_jo
 
 
 def _summary_md(run, cfg, F, arms, members) -> str:
-    L = ["# Model farm (step 3a) summary", "",
+    L = ["# Model farm summary", "",
          f"Run `{run.run_id}`, config hash `{cfg.hash}`, seed {cfg.seed}. Training rows only; the holdout is untouched. "
          f"{F['n_configurations']} configurations ({', '.join(members)}) on {len(arms)} arms, scored on 10 frozen outer splits "
          f"with 3 inner folds each, n_jobs = {F['n_jobs']} ({F['seconds'] // 60} min). Each procedure picks its winner inside every "
@@ -207,7 +208,9 @@ def _summary_md(run, cfg, F, arms, members) -> str:
          "| Procedure | AUROC (95% CI) | Calibration slope | Brier skill | Optimism |", "|---|---|---|---|---|"]
     for a in arms:
         for m in members + ["best"]:
-            r = F[f"{a}|{m}"]
+            r = F.get(f"{a}|{m}")
+            if r is None:                              # no configurations for this member on this arm
+                continue
             name = f"**{a} best member**" if m == "best" else f"{a} {m}"
             L.append(f"| {name} | {r['auroc']:.3f} ({r['ci'][0]:.3f}-{r['ci'][1]:.3f}) | {r['cal_slope']:.2f} | "
                      f"{r['brier_skill']:.3f} | {r['optimism']:+.3f} |")

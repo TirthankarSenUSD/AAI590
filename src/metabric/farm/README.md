@@ -1,8 +1,8 @@
 # farm: the model farm
 
-**Status:**
-- **Step 3a, built:** four classical members — elastic-net logistic regression, RBF SVM, random forest, XGBoost.
-- **Step 3b, planned:** the three neural members.
+**Status:** built.
+- **Step 3a:** four classical members — elastic-net logistic regression, RBF SVM, random forest, XGBoost.
+- **Step 3b:** three neural members — MLP, MLP with categorical embeddings, multimodal network.
 
 **Command:** `python run.py farm`, optionally with `--members logreg_en,xgboost` or `--arms C,C+RNA`.
 
@@ -14,6 +14,7 @@ The farm builds many candidate configurations (arm × member × RNA representati
 |---|---|
 | `preprocess.py` | In-fold preprocessing (all scikit-learn transformers, so the harness fits them on training rows only). |
 | `members.py` | Builds the candidate grid: estimators, the complexity order, and the parallel worker count. |
+| `neural.py` | The three PyTorch members as scikit-learn-compatible classifiers. |
 | `stage.py` | `run_farm()`: scoring, procedures, comparisons, permutation test, figures and the generated summary. |
 
 ## Data arms (first pass)
@@ -51,13 +52,24 @@ The farm builds many candidate configurations (arm × member × RNA representati
 | `svm_rbf` | C ∈ {0.1, 1, 10}, gamma = scale | RBF only; probabilities by Platt scaling inside the fold |
 | `random_forest` | 300 trees, max_features ∈ {sqrt, 0.2}, min_samples_leaf ∈ {5, 20} | |
 | `xgboost` | 300 rounds, learning rate 0.05, depth ∈ {2, 4}, colsample ∈ {0.5, 0.8} | hist method |
+| `mlp` | hidden ∈ {[32], [64, 32]}, dropout 0.3, weight decay 1e-3 | linear preprocessing (one-hot, scaled) |
+| `mlp_embed` | hidden ∈ {[32], [64, 32]}, dropout 0.3, weight decay 1e-3 | one learned embedding per categorical column (codes last; 0 = unseen level) |
+| `multimodal` | block dropout ∈ {0.1, 0.3}, dropout 0.3, weight decay 1e-3 | one encoder per block (clinical 16, RNA 32 units); C+RNA only; all genes |
 
-The full grid is 160 configurations: 20 for C, 120 for C+RNA (20 × 6 representations) and 20 for strict-clinical. Age enters as a plain linear term (no spline for now).
+**Neural guard rails** (`farm.neural`):
+- AdamW with weight decay, and dropout.
+- Early stopping (patience 15, at most 200 epochs) on a stratified 15% validation split carved from the *fitting* rows only.
+- Predictions averaged over 2 seeds.
+- One CPU thread per fit, and every seed fixed.
+
+On C+RNA the MLPs use only the `all` and `pca10` representations (`farm.neural_rna_representations`).
+
+The full grid is 178 configurations: C 24, C+RNA 130, strict-clinical 24. Age enters as a plain linear term (no spline for now).
 
 ## Selection and "simpler"
 
 A procedure picks its winner by the harness rule: best mean inner AUROC, and the simplest configuration within 1 SE wins. "Simpler" is fixed in config (`complexity_rule`):
-1. member family first (logistic regression < SVM < random forest = XGBoost);
+1. member family first (logistic regression < SVM < random forest = XGBoost < MLPs < multimodal);
 2. then fewer RNA inputs;
 3. then stronger regularisation.
 
@@ -81,13 +93,15 @@ Configurations are scored in parallel worker processes (`farm.n_jobs`; `auto` me
 | `paired_comparisons` | Each procedure against the age-only floor; C+RNA against C; strict-clinical against C |
 | `subgroup_metrics`, `reliability` | For the arm procedures |
 | `regression_floor` | Provisional, until the final model |
-| `permutation_test` | The full `C|best` procedure on shuffled labels |
+| `permutation_test` | The full `C|best` procedure (all members) on shuffled labels; 10 shuffles (`farm.n_permutations`) |
 | Figures | Procedure AUROC, winning members, calibration |
 | `farm_summary.md` | Generated summary |
 
-## Next (3b)
+## Not yet included
 
-The MLP, the MLP with categorical embeddings, and the multimodal network (one encoder per block, block dropout; PyTorch, CPU). They join the same grids, procedures and comparisons.
+- Neural representations (embeddings, autoencoder latents) offered to the other members.
+- The DNA arms (C+DNA, C+RNA+DNA, RNA, RNA+DNA, DNA).
+- The with/without `tumor_stage` comparison.
 
 ## Tests
 
@@ -99,3 +113,10 @@ The MLP, the MLP with categorical embeddings, and the multimodal network (one en
 - linear preprocessing is one-hot with missing flags and learns its fill values from training rows only;
 - the grid counts and the complexity order;
 - a real-data smoke run.
+
+`tests/test_neural.py`:
+- the networks learn known signal;
+- the same seed gives identical predictions;
+- unseen category codes are tolerated;
+- multimodal runs are reproducible;
+- embedding codes come last and are non-negative.
