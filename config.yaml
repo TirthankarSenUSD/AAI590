@@ -48,6 +48,36 @@ harness:
   subgroups: [chemotherapy, hormone_therapy, radio_therapy, type_of_breast_surgery, chemo_x_hormone]
   regression_floor_sd: 2            # regression floor = mean - 2 SD of outer-fold AUROC (B5)
 
+# Model farm (step 3). Small grids for the first pass; raise later without code changes.
+farm:
+  n_jobs: auto                      # auto = logical cores - 1 (at least 1); or an integer
+  members: [logreg_en, svm_rbf, random_forest, xgboost]      # 3a; 3b adds the three neural members
+  arms:
+    C: {blocks: [clinical]}
+    C+RNA: {blocks: [clinical, rna]}
+    strict_clinical: {blocks: [clinical], drop: [molecular_derived]}
+  # one column per concept (F-039): oncotree_code == cancer_type_detailed, which
+  # tumor_other_histologic_subtype determines; cancer_type has one sarcoma; NPI is a composite of
+  # size, nodes and grade (floor only)
+  drop_clinical: [oncotree_code, cancer_type_detailed, cancer_type, nottingham_prognostic_index]
+  rare_level_min_count: 20          # rarer categorical levels are pooled inside the fold
+  rna_representations:              # C+RNA arm only; all fitted inside the fold
+    all: {}                         # all 489 genes; linear members penalise them harder via rna_scale
+    top15: {topk: 15}
+    top30: {topk: 30}
+    top50: {topk: 50}
+    pca10: {pca: 10}
+    pca30: {pca: 30}
+  rna_scale: 0.5                    # standardised genes x 0.5 = 4x the L2 penalty of clinical columns
+  topk_selection: {n_subsamples: 10, fraction: 0.5, C: 0.05}   # selection frequency under L1 logistic regression
+  complexity_rule: "member family first (logreg < svm_rbf < random_forest = xgboost), then fewer RNA inputs, then stronger regularisation"
+  grids:
+    logreg_en: {C: [0.01, 0.1, 1.0], l1_ratio: [0.0, 0.5, 1.0]}
+    svm_rbf: {C: [0.1, 1.0, 10.0], gamma: [scale]}
+    random_forest: {n_estimators: [300], max_features: [sqrt, 0.2], min_samples_leaf: [5, 20]}
+    xgboost: {n_estimators: [300], learning_rate: [0.05], max_depth: [2, 4], subsample: [0.8],
+              colsample_bytree: [0.5, 0.8], min_child_weight: [5]}
+
 # Floors: always reported, never eligible to win (CLAUDE.md section 5). Built in step 2.
 floors:
   majority: {}

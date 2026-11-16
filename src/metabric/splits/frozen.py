@@ -10,8 +10,9 @@ from pathlib import Path
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-from .config import Config, write_holdout_hash
-from .data import Dataset, sha256_file
+from ..core.config import Config, write_holdout_hash
+from ..core.paths import sha256_file
+from ..data import Dataset
 
 
 class HoldoutError(RuntimeError):
@@ -108,7 +109,7 @@ def make_cv_splits(cfg: Config, train: Dataset) -> tuple[Config, pd.DataFrame, p
     out = pd.concat(rows, ignore_index=True)
     path.parent.mkdir(parents=True, exist_ok=True)
     out.to_csv(path, index=False, lineterminator="\n")
-    from .config import write_frozen_hash
+    from ..core.config import write_frozen_hash
     cfg = write_frozen_hash(cfg, "cv", "splits_sha256", sha256_file(path))
     return cfg, out, pd.concat(merges, ignore_index=True)
 

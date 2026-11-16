@@ -18,7 +18,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 
 from . import metrics as M
-from .stats import corrected_resampled_ttest
+from ..core.stats import corrected_resampled_ttest
 
 
 @dataclass
@@ -81,6 +81,88 @@ def select_candidate(stats: pd.DataFrame, within_se: float) -> str:
     return pool.sort_values(["complexity", "inner_log_loss", "inner_brier"]).iloc[0]["candidate"]
 
 
+def _fit(cand: Candidate, X: pd.DataFrame, rows: pd.Index, y: pd.Series):
+    est = cand.make()
+    est.fit(X.loc[rows, cand.columns], y.loc[rows].to_numpy())
+    return est
+
+
+def _proba(est, cand: Candidate, X: pd.DataFrame, rows: pd.Index) -> np.ndarray:
+    return est.predict_proba(X.loc[rows, cand.columns])[:, 1]
+
+
+def _score_candidate(c: Candidate, X: pd.DataFrame, y: pd.Series, splits: list[Split], h: dict,
+                     light: bool, need_inner: bool) -> tuple[list[dict], list[pd.DataFrame]]:
+    """One candidate on every split (the unit of parallel work). Everything is fitted on the
+    split's training rows; the threshold and recalibrator only on inner out-of-fold predictions."""
+    recs, preds = [], []
+    for s in splits:
+        ytr, yte = y.loc[s.train], y.loc[s.test]
+        prev = float(ytr.mean())
+        rec = {"candidate": c.name, "split_id": s.split_id, "repeat": s.repeat, "outer_fold": s.outer,
+               "complexity": c.complexity, "eligible": c.eligible}
+        oof = None
+        if need_inner:
+            oof = pd.Series(np.nan, index=s.train)
+            aucs, lls, brs = [], [], []
+            for tr, va in s.inner:
+                p_va = _proba(_fit(c, X, tr, y), c, X, va)
+                oof.loc[va] = p_va
+                yv = y.loc[va].to_numpy()
+                aucs.append(roc_auc_score(yv, p_va) if yv.min() != yv.max() else np.nan)
+                pc = M.clip(p_va)
+                lls.append(-np.mean(yv * np.log(pc) + (1 - yv) * np.log(1 - pc)))
+                brs.append(np.mean((p_va - yv) ** 2))
+            rec.update(inner_auroc=float(np.nanmean(aucs)),
+                       inner_auroc_se=float(np.nanstd(aucs, ddof=1) / np.sqrt(len(aucs))),
+                       inner_log_loss=float(np.mean(lls)), inner_brier=float(np.mean(brs)))
+        est = _fit(c, X, s.train, y)
+        p_te, p_tr = _proba(est, c, X, s.test), _proba(est, c, X, s.train)
+        m = M.binary_metrics(yte, p_te, prev)
+        rec.update(m)
+        rec["train_auroc"] = float(roc_auc_score(ytr, p_tr)) if ytr.nunique() > 1 else np.nan
+        rec["optimism"] = rec.get("inner_auroc", np.nan) - m["auroc"]
+        p_rc = np.full(len(p_te), np.nan)
+        if not light:
+            t = M.threshold_for_sensitivity(ytr.loc[oof.index], oof.to_numpy(), h["operating_point_sensitivity"])
+            rec.update({f"op_{k}": v for k, v in M.threshold_metrics(yte, p_te, t).items()})
+            cal = LogisticRegression(C=M.BIG_C, max_iter=1000).fit(M.logit(oof.to_numpy()).reshape(-1, 1), ytr.loc[oof.index])
+            p_rc = cal.predict_proba(M.logit(p_te).reshape(-1, 1))[:, 1]
+            rec.update({f"recal_{k}": v for k, v in M.binary_metrics(yte, p_rc, prev).items()
+                        if k in ("auroc", "log_loss", "brier", "brier_skill", "cal_intercept", "cal_slope")})
+        recs.append(rec)
+        preds.append(pd.DataFrame({"candidate": c.name, "split_id": s.split_id, "repeat": s.repeat,
+                                   "outer_fold": s.outer, "patient_id": s.test, "y": yte.to_numpy(),
+                                   "p": p_te, "p_recal": p_rc}))
+    return recs, preds
+
+
+_ID_COLS = ("candidate", "split_id", "repeat", "outer_fold", "complexity", "eligible")
+
+
+def procedure(folds: pd.DataFrame, names: list[str], within_se: float) -> pd.DataFrame:
+    """The select-the-best procedure over `names`: in each outer split the fixed rule picks a winner
+    from the inner statistics only; the procedure's outer metrics are the winner's outer metrics."""
+    f = folds[folds.candidate.isin(names)]
+    rows = []
+    for sid, g in f.groupby("split_id", sort=False):
+        win = select_candidate(g, within_se)
+        w = g[g.candidate == win].iloc[0]
+        rows.append({"split_id": sid, "repeat": int(w["repeat"]), "outer_fold": int(w["outer_fold"]), "winner": win,
+                     "winner_inner_auroc": w["inner_auroc"], "outer_auroc": w["auroc"],
+                     "optimism": w["inner_auroc"] - w["auroc"],
+                     **{f"proc_{k}": w[k] for k in g.columns if k not in _ID_COLS}})
+    return pd.DataFrame(rows)
+
+
+def procedure_preds(preds: pd.DataFrame, sel: pd.DataFrame, name: str) -> pd.DataFrame:
+    """Out-of-fold predictions of a procedure: in each split, the winner's outer predictions."""
+    win = sel.set_index("split_id").winner
+    p = preds[preds.candidate == preds.split_id.map(win)].copy()
+    p["candidate"] = name
+    return p.reset_index(drop=True)
+
+
 @dataclass
 class Result:
     folds: pd.DataFrame
@@ -98,71 +180,33 @@ class Harness:
 
     # -- core ------------------------------------------------------------------------------
     def _fit(self, cand: Candidate, rows: pd.Index, y: pd.Series):
-        est = cand.make()
-        est.fit(self.X.loc[rows, cand.columns], y.loc[rows].to_numpy())
-        return est
+        return _fit(cand, self.X, rows, y)
 
     def _proba(self, est, cand: Candidate, rows: pd.Index) -> np.ndarray:
-        return est.predict_proba(self.X.loc[rows, cand.columns])[:, 1]
+        return _proba(est, cand, self.X, rows)
 
     def evaluate(self, candidates: list[Candidate], y: pd.Series | None = None, select: bool = False,
-                 light: bool = False) -> Result:
+                 light: bool = False, n_jobs: int = 1) -> Result:
         """Score every candidate on every frozen split. `light` skips the inner layer (used by the
         permutation test when no selection is needed). `select` also scores the select-the-best
-        procedure, choosing inside each outer training fold by the fixed rule."""
+        procedure, choosing inside each outer training fold by the fixed rule.
+
+        `n_jobs > 1` scores candidates in parallel worker processes, one thread each (no
+        oversubscription). Every fit is seeded and results are assembled in candidate order, so
+        the output is identical for any n_jobs."""
         y = self.y if y is None else y.astype(int)
-        fold_rows, pred_rows, sel_rows = [], [], []
-        for s in self.splits:
-            ytr, yte = y.loc[s.train], y.loc[s.test]
-            prev = float(ytr.mean())
-            inner_stats, outer_p = [], {}
-            for c in candidates:
-                rec = {"candidate": c.name, "split_id": s.split_id, "repeat": s.repeat, "outer_fold": s.outer}
-                if not light or select:
-                    oof = pd.Series(np.nan, index=s.train)
-                    aucs, lls, brs = [], [], []
-                    for tr, va in s.inner:
-                        p_va = self._proba(self._fit(c, tr, y), c, va)
-                        oof.loc[va] = p_va
-                        yv = y.loc[va].to_numpy()
-                        aucs.append(roc_auc_score(yv, p_va) if yv.min() != yv.max() else np.nan)
-                        pc = M.clip(p_va)
-                        lls.append(-np.mean(yv * np.log(pc) + (1 - yv) * np.log(1 - pc)))
-                        brs.append(np.mean((p_va - yv) ** 2))
-                    rec.update(inner_auroc=float(np.nanmean(aucs)),
-                               inner_auroc_se=float(np.nanstd(aucs, ddof=1) / np.sqrt(len(aucs))),
-                               inner_log_loss=float(np.mean(lls)), inner_brier=float(np.mean(brs)))
-                    inner_stats.append({"candidate": c.name, "complexity": c.complexity, "eligible": c.eligible,
-                                        **{k: rec[k] for k in ("inner_auroc", "inner_auroc_se", "inner_log_loss", "inner_brier")}})
-                est = self._fit(c, s.train, y)
-                p_te, p_tr = self._proba(est, c, s.test), self._proba(est, c, s.train)
-                outer_p[c.name] = p_te
-                m = M.binary_metrics(yte, p_te, prev)
-                rec.update(m)
-                rec["train_auroc"] = float(roc_auc_score(ytr, p_tr)) if ytr.nunique() > 1 else np.nan
-                rec["optimism"] = rec.get("inner_auroc", np.nan) - m["auroc"]
-                p_rc = np.full(len(p_te), np.nan)
-                if not light:
-                    t = M.threshold_for_sensitivity(ytr.loc[oof.index], oof.to_numpy(), self.h["operating_point_sensitivity"])
-                    rec.update({f"op_{k}": v for k, v in M.threshold_metrics(yte, p_te, t).items()})
-                    cal = LogisticRegression(C=M.BIG_C, max_iter=1000).fit(M.logit(oof.to_numpy()).reshape(-1, 1), ytr.loc[oof.index])
-                    p_rc = cal.predict_proba(M.logit(p_te).reshape(-1, 1))[:, 1]
-                    rec.update({f"recal_{k}": v for k, v in M.binary_metrics(yte, p_rc, prev).items()
-                                if k in ("auroc", "log_loss", "brier", "brier_skill", "cal_intercept", "cal_slope")})
-                fold_rows.append(rec)
-                pred_rows.append(pd.DataFrame({"candidate": c.name, "split_id": s.split_id, "repeat": s.repeat,
-                                               "outer_fold": s.outer, "patient_id": s.test, "y": yte.to_numpy(),
-                                               "p": p_te, "p_recal": p_rc}))
-            if select:
-                st = pd.DataFrame(inner_stats)
-                win = select_candidate(st, self.h["select_within_se"])
-                p = outer_p[win]
-                m = M.binary_metrics(yte, p, prev)
-                best_inner = float(st.set_index("candidate").loc[win, "inner_auroc"])
-                sel_rows.append({"split_id": s.split_id, "repeat": s.repeat, "outer_fold": s.outer, "winner": win,
-                                 "winner_inner_auroc": best_inner, "outer_auroc": m["auroc"],
-                                 "optimism": best_inner - m["auroc"], **{f"proc_{k}": v for k, v in m.items()}})
-        return Result(pd.DataFrame(fold_rows), pd.concat(pred_rows, ignore_index=True), pd.DataFrame(sel_rows))
+        kw = dict(splits=self.splits, h=self.h, light=light, need_inner=(not light) or select)
+        if n_jobs == 1 or len(candidates) == 1:
+            outs = [_score_candidate(c, self.X[c.columns], y, **kw) for c in candidates]
+        else:
+            from joblib import Parallel, delayed, parallel_config
+            with parallel_config(backend="loky", inner_max_num_threads=1):
+                outs = Parallel(n_jobs=n_jobs)(delayed(_score_candidate)(c, self.X[c.columns], y, **kw)
+                                               for c in candidates)
+        folds = pd.DataFrame([r for recs, _ in outs for r in recs])
+        preds = pd.concat([p for _, ps in outs for p in ps], ignore_index=True)
+        sel = procedure(folds, [c.name for c in candidates], self.h["select_within_se"]) if select else pd.DataFrame()
+        return Result(folds, preds, sel)
 
     # -- summaries ---------------------------------------------------------------------------
     METRICS = ("auroc", "auprc", "log_loss", "brier", "brier_skill", "cal_intercept", "cal_slope",

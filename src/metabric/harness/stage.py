@@ -4,13 +4,13 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from .artifacts import Run
-from .config import Config
-from .data import load_dataset
-from .eda import plots as P
+from ..core.artifacts import Run
+from ..core.config import Config
+from ..data import load_dataset
+from ..eda import plots as P
 from .floors import design_matrix, floor_candidates
-from .harness import Harness, reliability, splits_from_table
-from .splits import load_cv_splits, training_ids
+from .core import Harness, reliability, splits_from_table
+from ..splits import load_cv_splits, training_ids
 
 
 def treatment_groups(f: pd.DataFrame) -> pd.DataFrame:

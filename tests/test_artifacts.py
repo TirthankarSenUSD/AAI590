@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 import pandas as pd  # noqa: E402
 import pytest  # noqa: E402
 
-from metabric.artifacts import Run  # noqa: E402
+from metabric.core.artifacts import Run  # noqa: E402
 
 
 def test_run_layout_and_manifest(tmp_project):

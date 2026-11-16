@@ -10,7 +10,7 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-from .config import Config
+from ..core.config import Config
 
 ER_IHC = "er_status_measured_by_ihc"
 TYPO_FIXES = {ER_IHC: {"Positve": "Positive"}}
@@ -167,14 +167,7 @@ def load_dataset(cfg: Config) -> Dataset:
     return Dataset(frame=df, y=y, mutations=muts, blocks=cfg.blocks)
 
 
-def sha256_file(path) -> str:
-    import hashlib
-    h = hashlib.sha256()
-    with open(path, "rb") as fh:
-        for chunk in iter(lambda: fh.read(1 << 20), b""):
-            h.update(chunk)
-    return h.hexdigest()
 
 
 __all__ = ["DataValidationError", "Dataset", "load_dataset", "read_raw", "validate_raw", "clean",
-           "make_target", "binarise_mutations", "missing_indicators", "npi_standard", "sha256_file"]
+           "make_target", "binarise_mutations", "missing_indicators", "npi_standard"]

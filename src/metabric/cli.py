@@ -4,8 +4,8 @@ from __future__ import annotations
 import argparse
 import sys
 
-from .artifacts import Run
-from .config import load_config
+from .core.artifacts import Run
+from .core.config import load_config
 from .data import load_dataset
 
 
@@ -24,6 +24,11 @@ def cmd_crosswalk(args) -> str:
         res = build_crosswalk(cfg)
         for p in write_crosswalk(res, cfg):
             run.record_external(p, "gene crosswalk table", "metabric.crosswalk.write_crosswalk")
+        # Snapshot of the four tables inside the run: reference/crosswalk/ is rebuilt in place by later
+        # runs, so the run folder keeps its own copy and its provenance stays verifiable.
+        for name, df in zip(("gene_crosswalk", "gene_set_membership", "gene_set_summary", "unmatched_genes"),
+                            (res.crosswalk, res.membership, res.summary, res.unmatched)):
+            st.table(f"snapshot_{name}", df, f"Snapshot of reference/crosswalk/{name}.csv as built by this run")
         st.table("coverage", res.coverage, "Gene-set coverage of the 489 RNA and 173 DNA columns per source")
         chk = check_coverage(res.coverage, cfg)
         st.table("coverage_check", chk, "Observed coverage against the expected values in CLAUDE.md 3b")
@@ -97,11 +102,25 @@ def cmd_splits(args) -> str:
 
 
 def cmd_harness(args) -> str:
-    from .harness_stage import run_harness
+    from .harness.stage import run_harness
     cfg = load_config()
     run = Run(cfg, "harness")
     try:
         run_harness(cfg, run)
+        run.finalize()
+    except BaseException as exc:
+        run.fail(exc)
+        raise
+    return run.run_id
+
+
+def cmd_farm(args) -> str:
+    from .farm.stage import run_farm
+    cfg = load_config()
+    run = Run(cfg, "farm" + (f" --members {','.join(args.members)}" if args.members else "")
+              + (f" --arms {','.join(args.arms)}" if args.arms else ""))
+    try:
+        run_farm(cfg, run, args.members, args.arms)
         run.finalize()
     except BaseException as exc:
         run.fail(exc)
@@ -131,11 +150,14 @@ def main(argv=None) -> int:
     sub.add_parser("holdout", help="create the frozen 20%% holdout (once only)")
     sub.add_parser("splits", help="create the frozen nested CV splits on the training rows (once only)")
     sub.add_parser("harness", help="run the floors through the evaluation harness")
+    f = sub.add_parser("farm", help="run the model farm through the harness (members and arms from config)")
+    f.add_argument("--members", type=lambda s: s.split(","), default=None, help="comma-separated subset of farm.members")
+    f.add_argument("--arms", type=lambda s: s.split(","), default=None, help="comma-separated subset of farm.arms")
     e = sub.add_parser("eda", help="rerunnable EDA stage")
     e.add_argument("--mode", choices=["descriptive", "modelling", "both"], default="both")
     args = p.parse_args(argv)
     rid = {"crosswalk": cmd_crosswalk, "holdout": cmd_holdout, "splits": cmd_splits, "harness": cmd_harness,
-           "eda": cmd_eda}[args.cmd](args)
+           "farm": cmd_farm, "eda": cmd_eda}[args.cmd](args)
     print(f"run complete: outputs/{rid}")
     return 0
 

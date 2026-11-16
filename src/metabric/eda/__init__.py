@@ -13,8 +13,8 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 
-from ..artifacts import Run, Stage, _caller
-from ..config import Config
+from ..core.artifacts import Run, Stage, _caller
+from ..core.config import Config
 from ..data import Dataset, load_dataset, read_raw
 from ..splits import load_holdout
 from . import plots as P
@@ -130,7 +130,7 @@ def split_diagnostics(ctx: Ctx, full: Dataset, hold: pd.DataFrame, run: Run) -> 
     add("er_status", "Positive", f["er_status"] == "Positive", False)
     add("tumor_stage", "missing", f["tumor_stage"].isna(), False)
     a_tr, a_ho = f.loc[tr, "age_at_diagnosis"], f.loc[ho, "age_at_diagnosis"]
-    from ..stats import smd as _smd
+    from ..core.stats import smd as _smd
     sm = _smd(a_ho, a_tr)
     rows.append({"variable": "age_at_diagnosis", "level": "mean", "train": a_tr.mean(), "holdout": a_ho.mean(),
                  "diff": a_ho.mean() - a_tr.mean(), "smd": sm, "stratified": False,
@@ -192,7 +192,7 @@ def _fold_balance(ctx: Ctx, full: Dataset, hold: pd.DataFrame, run: Run, rule: d
             rows.append({"split_id": sid, "variable": v, "train": p1, "test": p2, "diff": p2 - p1, "smd": smd,
                          "stratified": strat, "status": status})
         a1, a2 = f.loc[trn, "age_at_diagnosis"], f.loc[te, "age_at_diagnosis"]
-        from ..stats import smd as _smd
+        from ..core.stats import smd as _smd
         s = _smd(a2, a1)
         rows.append({"split_id": sid, "variable": "age_mean", "train": a1.mean(), "test": a2.mean(), "diff": a2.mean() - a1.mean(),
                      "smd": s, "stratified": False, "status": "warn" if abs(s) > rule["warn_smd"] else "ok"})

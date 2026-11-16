@@ -16,6 +16,25 @@ A reproducible machine-learning pipeline that predicts overall survival in breas
 | 3 | Model farm | next |
 | 4–7 | Importance, ensemble, model-agreement analysis, report | planned |
 
+## Pipeline stages
+
+Each stage lives in its own folder under `src/metabric/`, with a `README.md` that explains exactly what it does: inputs, steps, outputs, rules, settings and tests.
+
+| # | Stage | What it does | Command | State | Details |
+|---|---|---|---|---|---|
+| – | Core | Paths, config and hashing, artifact writer and manifest, statistics | – | built | [core/README.md](src/metabric/core/README.md) |
+| 1 | Data layer | Read, validate, clean; target (death); mutation flags; standard NPI | – | built | [data/README.md](src/metabric/data/README.md) |
+| 1a | Gene crosswalk | Dataset gene columns ↔ Hallmark and Reactome gene sets | `crosswalk` | built | [crosswalk/README.md](src/metabric/crosswalk/README.md) |
+| 1 / 2 | Splits | Frozen 20% holdout; frozen nested CV splits | `holdout`, `splits` | built | [splits/README.md](src/metabric/splits/README.md) |
+| 1b | EDA | Descriptive and modelling-mode EDA, reference check, split balance | `eda` | built | [eda/README.md](src/metabric/eda/README.md) |
+| 2 | Evaluation harness | Nested CV scoring, selection rule, floors, statistical checks | `harness` | built | [harness/README.md](src/metabric/harness/README.md) |
+| 3 | Model farm | Seven models across data arms | – | planned | [farm/README.md](src/metabric/farm/README.md) |
+| 4 | Importance | Gates, SHAP and permutation importance | – | planned | [importance/README.md](src/metabric/importance/README.md) |
+| 5 | Ensemble | Fused arm, agreement merge, stacker | – | planned | [ensemble/README.md](src/metabric/ensemble/README.md) |
+| 6 | Agreement | Model-agreement analysis and the omics ablation | – | planned | [agreement/README.md](src/metabric/agreement/README.md) |
+| 7 | Report | Generated validation report and patient-level output | – | planned | [report/README.md](src/metabric/report/README.md) |
+| P2 | Phase 2 | Survival analysis on the same splits | – | planned | [phase2/README.md](src/metabric/phase2/README.md) |
+
 ## Design principles
 
 - **No leakage.** Every fitted step runs inside cross-validation folds. A 20% holdout (381 patients, stratified on outcome × cohort × chemotherapy) was created once, is hash-checked on every run and is scored only once, at the end.
@@ -30,12 +49,19 @@ A reproducible machine-learning pipeline that predicts overall survival in breas
 ├── run.py                  command-line entry point
 ├── config.yaml             all settings, column lists, reference values
 ├── requirements.txt        exact package versions
-├── src/metabric/           pipeline code (data, crosswalk, splits, artifacts, stats, eda/)
+├── src/metabric/           pipeline code, one folder per stage, each with a README.md
+│   ├── cli.py              commands behind run.py
+│   ├── core/               paths, config, artifacts and manifest, statistics
+│   ├── data/               data layer
+│   ├── crosswalk/          gene crosswalk
+│   ├── splits/             frozen holdout and CV splits
+│   ├── eda/                exploratory data analysis
+│   ├── harness/            evaluation harness and floors
+│   └── farm/ importance/ ensemble/ agreement/ report/ phase2/   (planned)
 ├── tests/                  test suite (pytest)
 ├── data/                   METABRIC_RNA_Mutation.csv (read-only)
 ├── reference/              gene-set files; crosswalk/ is built from them
 ├── outputs/                run artifacts (created by the pipeline)
-├── diagram/                pipeline diagram (HTML) and its generator
 ├── PLAN.md                 design, requirements and decision log
 ├── FINDINGS.md             build log of findings and decisions (append-only)
 └── RUNME.md                reproduction commands

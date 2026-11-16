@@ -8,7 +8,7 @@ from scipy import stats
 from scipy.cluster.hierarchy import fcluster, leaves_list, linkage
 from scipy.spatial.distance import squareform
 
-from .. import stats as st
+from ..core import stats as st
 from . import plots as P
 
 OTHER = "Died of Other Causes"

@@ -13,7 +13,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from .config import Config
+from ..core.config import Config
 
 OUTPUT_FILES = ("gene_crosswalk.csv", "gene_set_membership.csv", "gene_set_summary.csv", "unmatched_genes.csv")
 

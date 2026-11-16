@@ -2,7 +2,7 @@ import pandas as pd
 import pytest
 import yaml
 
-from metabric.config import Config
+from metabric.core.config import Config
 from metabric.crosswalk import GeneSetIndex, build_crosswalk, canonical_symbol, read_gmt, write_crosswalk
 
 

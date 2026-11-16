@@ -10,9 +10,9 @@ from sklearn.model_selection import StratifiedKFold
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
-from metabric import metrics as M
+from metabric.harness import metrics as M
 from metabric.harness import Candidate, Harness, Split, check_split_hygiene, select_candidate
-from metabric.stats import corrected_resampled_ttest
+from metabric.core.stats import corrected_resampled_ttest
 
 HCFG = {"harness": {"operating_point_sensitivity": 0.8, "recalibration": "platt", "reliability_bins": 10, "n_boot": 50,
                     "n_permutations": 10, "chance_band": 0.03, "select_within_se": 1.0,
@@ -165,7 +165,7 @@ def test_calibration_metrics_on_calibrated_probabilities():
 
 
 def test_real_floors_on_frozen_splits(cfg, ds):
-    from metabric.floors import design_matrix, floor_candidates
+    from metabric.harness.floors import design_matrix, floor_candidates
     from metabric.harness import splits_from_table
     from metabric.splits import load_cv_splits, training_ids
     tr = training_ids(cfg, ds)

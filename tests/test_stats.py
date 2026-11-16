@@ -3,7 +3,7 @@ import pandas as pd
 from scipy.stats import mannwhitneyu
 from sklearn.metrics import roc_auc_score
 
-from metabric import stats as st
+from metabric.core import stats as st
 
 
 def test_auroc_matches_sklearn_and_drops_missing():

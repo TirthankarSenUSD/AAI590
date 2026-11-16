@@ -8,8 +8,8 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
-from .data import Dataset, npi_standard
-from .harness import Candidate
+from ..data import Dataset, npi_standard
+from .core import Candidate
 from .metrics import BIG_C
 
 

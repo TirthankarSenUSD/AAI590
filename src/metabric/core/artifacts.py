@@ -20,7 +20,7 @@ from pathlib import Path
 import pandas as pd
 
 from .config import Config
-from .data import sha256_file
+from .paths import sha256_file
 
 STAGES = ("crosswalk", "eda", "splits", "harness", "farm", "importance", "ensemble",
           "agreement", "report", "phase2", "models")
@@ -216,5 +216,5 @@ class Stage:
             h.close()
             self.log.removeHandler(h)
         if not self._log_registered and self.log_path.exists():
-            self.run._register(self.log_path, self.name, "log", f"{self.name} stage log", "metabric.artifacts")
+            self.run._register(self.log_path, self.name, "log", f"{self.name} stage log", "metabric.core.artifacts")
             self._log_registered = True
