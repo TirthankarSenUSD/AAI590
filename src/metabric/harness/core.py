@@ -256,18 +256,28 @@ class Harness:
         return pd.DataFrame(rows)
 
     def overfit_gate(self, folds: pd.DataFrame) -> pd.DataFrame:
+        """Two separate questions (F-042):
+        - overfitting: train-versus-CV AUROC gap above the limit, or calibration slope below the
+          minimum (over-confident predictions) -> status 'overfit';
+        - under-confidence: slope above `recalibrate_above_slope` -> status 'recalibrate', and the
+          in-fold recalibrated probabilities become the primary ones.
+        Flags are reported only; they never exclude a configuration from selection."""
         gate = self.h["overfit_gate"]
-        lo, hi = gate["calibration_slope"]
         rows = []
         for c, g in folds.groupby("candidate", sort=False):
             gap = float((g.train_auroc - g.auroc).mean())
             slope = float(g.cal_slope.mean()) if g.cal_slope.notna().any() else np.nan
-            gap_ok = gap <= gate["max_train_cv_auroc_gap"]
-            slope_ok = True if np.isnan(slope) else lo <= slope <= hi
+            recal_slope = float(g.recal_cal_slope.mean()) if "recal_cal_slope" in g and g.recal_cal_slope.notna().any() else np.nan
+            gap_flag = gap > gate["max_train_cv_auroc_gap"]
+            over_conf = (not np.isnan(slope)) and slope < gate["min_calibration_slope"]
+            under_conf = (not np.isnan(slope)) and slope > gate["recalibrate_above_slope"]
+            status = "overfit" if (gap_flag or over_conf) else ("recalibrate" if under_conf else "pass")
             rows.append({"candidate": c, "train_auroc": g.train_auroc.mean(), "cv_auroc": g.auroc.mean(),
-                         "train_cv_gap": gap, "gap_limit": gate["max_train_cv_auroc_gap"], "cal_slope": slope,
-                         "slope_range": f"{lo}-{hi}", "gap_flag": not gap_ok,
-                         "slope_flag": (not slope_ok), "status": "pass" if gap_ok and slope_ok else "flag"})
+                         "train_cv_gap": gap, "gap_limit": gate["max_train_cv_auroc_gap"], "gap_flag": gap_flag,
+                         "cal_slope": slope, "overconfident_flag": over_conf, "underconfident_flag": under_conf,
+                         "recal_cal_slope": recal_slope, "status": status,
+                         "primary_probabilities": "recalibrated" if under_conf else "raw",
+                         "action": gate.get("action", "report")})
         return pd.DataFrame(rows)
 
     def learning_curve(self, candidates: list[Candidate], rng: np.random.Generator) -> pd.DataFrame:

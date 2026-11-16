@@ -17,7 +17,8 @@ from metabric.core.stats import corrected_resampled_ttest
 HCFG = {"harness": {"operating_point_sensitivity": 0.8, "recalibration": "platt", "reliability_bins": 10, "n_boot": 50,
                     "n_permutations": 10, "chance_band": 0.03, "select_within_se": 1.0,
                     "learning_curve_fractions": [0.5, 1.0],
-                    "overfit_gate": {"max_train_cv_auroc_gap": 0.05, "calibration_slope": [0.8, 1.2]},
+                    "overfit_gate": {"max_train_cv_auroc_gap": 0.05, "min_calibration_slope": 0.8,
+                                     "recalibrate_above_slope": 1.2, "action": "report"},
                     "regression_floor_sd": 2}}
 
 
@@ -173,3 +174,15 @@ def test_real_floors_on_frozen_splits(cfg, ds):
     a = H.evaluate(floor_candidates(cfg), light=True).folds.groupby("candidate").auroc.mean()
     assert a["majority"] == 0.5
     assert 0.64 < a["age_only"] < 0.73 and 0.55 < a["npi_file"] < 0.66 and 0.55 < a["npi_standard"] < 0.67
+
+
+def test_overfit_gate_separates_overfitting_from_underconfidence():
+    X, y, _ = synth(n=300)
+    H = Harness(HCFG, X, y, make_splits(y))
+    f = pd.DataFrame({"candidate": ["ok"] * 2 + ["gap"] * 2 + ["over"] * 2 + ["under"] * 2,
+                      "train_auroc": [0.75, 0.75, 0.90, 0.90, 0.75, 0.75, 0.75, 0.75],
+                      "auroc": [0.74] * 8, "cal_slope": [1.0, 1.0, 1.0, 1.0, 0.7, 0.7, 1.4, 1.4],
+                      "recal_cal_slope": [1.0] * 8})
+    g = H.overfit_gate(f).set_index("candidate")
+    assert g.status.to_dict() == {"ok": "pass", "gap": "overfit", "over": "overfit", "under": "recalibrate"}
+    assert g.loc["under", "primary_probabilities"] == "recalibrated" and g.loc["ok", "primary_probabilities"] == "raw"

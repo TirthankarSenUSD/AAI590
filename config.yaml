@@ -42,9 +42,11 @@ harness:
   chance_band: 0.03                 # permuted-label mean AUROC must lie within 0.5 +/- this
   select_within_se: 1.0             # simpler candidate wins within this many SE of the best inner AUROC
   learning_curve_fractions: [0.25, 0.5, 0.75, 1.0]
-  overfit_gate:                     # fixed before running (F-031); owner confirmed 2026-11-16 (F-035)
-    max_train_cv_auroc_gap: 0.05
-    calibration_slope: [0.8, 1.2]
+  overfit_gate:                     # limits fixed before running (F-031, F-035); action revised by owner (F-042)
+    max_train_cv_auroc_gap: 0.05    # gap above this = overfitting flag
+    min_calibration_slope: 0.8      # slope below this (over-confident) = overfitting flag
+    recalibrate_above_slope: 1.2    # slope above this (under-confident) = needs recalibration: recalibrated probabilities are primary
+    action: report                  # flags are reported; they never exclude a configuration from selection
   subgroups: [chemotherapy, hormone_therapy, radio_therapy, type_of_breast_surgery, chemo_x_hormone]
   regression_floor_sd: 2            # regression floor = mean - 2 SD of outer-fold AUROC (B5)
 

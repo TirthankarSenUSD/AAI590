@@ -49,7 +49,7 @@ It records the winner, its outer score and the optimism. The headline of later s
 | `summarise` | Mean, SD and a Nadeau–Bengio corrected-t 95% CI over the outer splits for every metric. |
 | `paired` | Paired differences between candidates on identical splits, corrected resampled t-test. |
 | `subgroups` | AUROC (bootstrap CI), Brier, mean prediction and observed rate within treatment subgroups: chemotherapy, hormone therapy, radiotherapy, surgery type, chemo × hormone. Uses each patient's out-of-fold prediction averaged over the two repeats. |
-| `overfit_gate` | Flags a train-versus-CV AUROC gap above 0.05, or a calibration slope outside 0.8–1.2 (limits fixed before running, owner-confirmed). |
+| `overfit_gate` | Two separate questions; report only, never excludes from selection. **Overfitting** (status `overfit`): a train-versus-CV AUROC gap above 0.05, or a calibration slope below 0.8 (over-confident). **Under-confidence** (status `recalibrate`): a slope above 1.2, in which case the in-fold recalibrated probabilities become the primary ones. |
 | `learning_curve` | Outer AUROC at 25/50/75/100% of the outer training rows (reported, not gating). |
 | `permutation_test` | Reruns the full procedure on shuffled labels; the mean AUROC must lie within 0.5 ± 0.03. |
 | `loco` | Leave-one-cohort-out on the training rows (sensitivity only). |

@@ -49,7 +49,7 @@ def run_harness(cfg: Config, run: Run) -> dict:
     sub = H.subgroups(res.preds, treatment_groups(ds.frame), rng)
     st.table("subgroup_metrics", sub, "Metrics within treatment subgroups (out-of-fold predictions averaged over repeats; bootstrap 95% CI)")
     gate = H.overfit_gate(res.folds)
-    st.table("overfit_gate", gate, "Overfit gate: train-versus-CV AUROC gap and calibration slope against limits fixed in config")
+    st.table("overfit_gate", gate, "Overfit gate: overfitting (train-CV gap, slope < 0.8) and under-confidence (slope > 1.2: recalibrated probabilities primary); report only")
     lc = H.learning_curve(cands, rng)
     st.table("learning_curve", lc, "Learning curves: outer-fold AUROC by fraction of the outer training rows (reported, not gating)")
     rel = reliability(res.preds, cfg["harness"]["reliability_bins"])
@@ -147,7 +147,8 @@ def _facts(summ, pair, gate, rf, perm, loco, sub, n, n_splits) -> dict:
         r = r.iloc[0]
         F[f"diff_{a}_vs_{b}"] = {"mean": round(sign * r.mean_diff, 4), "p": round(r.p, 4),
                                  "ci": sorted([round(sign * r.ci_low, 4), round(sign * r.ci_high, 4)])}
-    F["gate_flags"] = gate[gate.status == "flag"].candidate.tolist()
+    F["gate_overfit"] = gate[gate.status == "overfit"].candidate.tolist()
+    F["gate_recalibrate"] = gate[gate.status == "recalibrate"].candidate.tolist()
     F["regression_floor"] = {r.candidate: round(r.regression_floor, 4) for r in rf.itertuples()}
     F["permutation"] = {k: (round(v, 4) if isinstance(v, float) else v) for k, v in perm.items()}
     lo = loco[loco.candidate == "age_only"]
@@ -185,7 +186,9 @@ def _summary_md(run, cfg, F, cands) -> str:
           f"- Label-permutation test ({P_['n_permutations']} shuffles of the age-only procedure): mean AUROC {P_['perm_mean']:.3f} "
           f"(max {P_['perm_max']:.3f}) against {P_['observed_auroc']:.3f} observed; "
           f"{'at chance, as required' if P_['at_chance'] else 'NOT at chance: investigate leakage'}.",
-          f"- Overfit gate: {'no floor flagged' if not F['gate_flags'] else 'flagged: ' + ', '.join(F['gate_flags'])}.",
+          f"- Overfit gate (report only; never excludes from selection): overfitting (train-CV gap > 0.05 or slope < 0.8) in "
+          f"{'no floor' if not F['gate_overfit'] else ', '.join(F['gate_overfit'])}; under-confident (slope > 1.2, recalibrated "
+          f"probabilities are primary) in {'no floor' if not F['gate_recalibrate'] else ', '.join(F['gate_recalibrate'])}.",
           f"- Leave-one-cohort-out, age-only AUROC ranges {F['loco_age_auroc_range'][0]:.3f}-{F['loco_age_auroc_range'][1]:.3f} across held-out cohorts.",
           f"- Age-only AUROC within chemotherapy groups: " + ", ".join(f"{k} {v:.3f}" for k, v in F["age_auroc_by_chemo"].items()) + ".",
           "- Regression floors (mean - 2 SD of outer-fold AUROC): " + ", ".join(f"{k} {v:.3f}" for k, v in F["regression_floor"].items()) + ".",

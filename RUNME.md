@@ -10,13 +10,14 @@ pip install -r requirements.txt     # exact pins; torch from the PyTorch CPU whe
 ```
 Use the activated env. Do not mix in conda's numpy/MKL packages: that brings a second OpenMP runtime and torch fails to import (FINDINGS F-014, F-027).
 
-## Build steps done so far (1, 1a, 1b, 2)
+## Build steps done so far (1, 1a, 1b, 2, 3a)
 ```
 python run.py crosswalk             # 1a: writes reference/crosswalk/*.csv + a run with the coverage check
 python run.py holdout               # ONCE ONLY: frozen 20% holdout -> outputs/frozen/holdout.csv, hash into config.yaml
 python run.py splits                # ONCE ONLY: frozen nested CV splits on the training rows -> outputs/frozen/cv_splits.csv
 python run.py eda --mode both       # 1b: descriptive (all patients) + modelling (training rows, holdout + fold balance) EDA
 python run.py harness               # 2: floors through the nested CV (about 45 s)
+python run.py farm                  # 3a: 160 configurations + permutation test (about 50 min with farm.n_jobs = auto on 8 cores)
 python -m pytest -q                 # 47 tests (about 70 s; synthetic harness tests + EDA rerun)
 ```
 - `holdout` and `splits` refuse to run if their file exists. Every later stage verifies both files against the hashes in `config.yaml`.

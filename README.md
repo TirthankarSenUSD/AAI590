@@ -13,7 +13,8 @@ A reproducible machine-learning pipeline that predicts overall survival in breas
 | 1a | Gene crosswalk between dataset columns and gene-set files | done |
 | 1b | Rerunnable exploratory data analysis (EDA) | done |
 | 2 | Evaluation harness (nested cross-validation, baselines) | done |
-| 3 | Model farm | next |
+| 3a | Model farm: classical members (logistic regression, SVM, random forest, XGBoost) | done |
+| 3b | Model farm: neural members | next |
 | 4–7 | Importance, ensemble, model-agreement analysis, report | planned |
 
 ## Pipeline stages
@@ -28,7 +29,7 @@ Each stage lives in its own folder under `src/metabric/`, with a `README.md` tha
 | 1 / 2 | Splits | Frozen 20% holdout; frozen nested CV splits | `holdout`, `splits` | built | [splits/README.md](src/metabric/splits/README.md) |
 | 1b | EDA | Descriptive and modelling-mode EDA, reference check, split balance | `eda` | built | [eda/README.md](src/metabric/eda/README.md) |
 | 2 | Evaluation harness | Nested CV scoring, selection rule, floors, statistical checks | `harness` | built | [harness/README.md](src/metabric/harness/README.md) |
-| 3 | Model farm | Seven models across data arms | – | planned | [farm/README.md](src/metabric/farm/README.md) |
+| 3 | Model farm | Seven models across data arms (3a: four classical members) | `farm` | 3a built; 3b planned | [farm/README.md](src/metabric/farm/README.md) |
 | 4 | Importance | Gates, SHAP and permutation importance | – | planned | [importance/README.md](src/metabric/importance/README.md) |
 | 5 | Ensemble | Fused arm, agreement merge, stacker | – | planned | [ensemble/README.md](src/metabric/ensemble/README.md) |
 | 6 | Agreement | Model-agreement analysis and the omics ablation | – | planned | [agreement/README.md](src/metabric/agreement/README.md) |
@@ -89,6 +90,7 @@ python run.py holdout            # create the frozen holdout (once only; refuses
 python run.py splits             # create the frozen nested CV splits (once only; refuses if they exist)
 python run.py eda --mode both    # EDA: descriptive (all patients) and modelling (training rows only)
 python run.py harness            # baselines ("floors") through the nested cross-validation
+python run.py farm               # model farm through the same nested cross-validation (about 50 min on 8 cores)
 python -m pytest -q              # run the test suite (about 70 s)
 ```
 

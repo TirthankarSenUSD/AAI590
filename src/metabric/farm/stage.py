@@ -89,7 +89,7 @@ def run_farm(cfg: Config, run: Run, members=None, arms=None) -> dict:
             .reset_index())
     st.table("winner_stability", stab, "Winner stability: how often the same configuration / member / representation wins across splits")
     gate = H.overfit_gate(pf)
-    st.table("overfit_gate", gate, "Overfit gate on the procedures (winner's train AUROC minus outer AUROC; calibration slope)")
+    st.table("overfit_gate", gate, "Overfit gate on the procedures: overfitting (train-CV gap, slope < 0.8) and under-confidence (slope > 1.2: recalibrated probabilities primary); report only")
 
     pairs = []
     def pair(a, b, label):
@@ -191,7 +191,8 @@ def _facts(summ, pairs, gate, stab, perm, perm_arm, arms, members, n_cands, n_jo
                 "cal_slope": round(g(p, "cal_slope"), 3), "brier_skill": round(g(p, "brier_skill"), 4),
                 "optimism": round(g(p, "optimism"), 4)}
     F["pairs"] = pairs[pairs.metric == "auroc"][["comparison", "a", "b", "mean_diff", "ci_low", "ci_high", "p"]].round(4).to_dict("records")
-    F["gate_flags"] = gate[gate.status == "flag"].candidate.tolist()
+    F["gate_overfit"] = gate[gate.status == "overfit"].candidate.tolist()
+    F["gate_recalibrate"] = gate[gate.status == "recalibrate"].candidate.tolist()
     F["stability"] = stab[stab.procedure.str.endswith("|best")][["procedure", "top_member", "top_member_share", "top_representation"]].to_dict("records")
     F["permutation"] = {**{k: (round(v, 4) if isinstance(v, float) else v) for k, v in perm.items()}, "procedure": f"{perm_arm}|best"}
     return F
@@ -223,5 +224,7 @@ def _summary_md(run, cfg, F, arms, members) -> str:
     L += [f"- Label-permutation test of the full {P_['procedure']} procedure ({P_['n_permutations']} shuffles): mean AUROC "
           f"{P_['perm_mean']:.3f} (max {P_['perm_max']:.3f}) against {P_['observed_auroc']:.3f}; "
           f"{'at chance, as required' if P_['at_chance'] else 'NOT at chance: investigate'}.",
-          f"- Overfit gate: {'no procedure flagged' if not F['gate_flags'] else 'flagged: ' + ', '.join(F['gate_flags'])}.", ""]
+          f"- Overfit gate (report only; never excludes from selection): overfitting (train-CV gap > 0.05 or slope < 0.8) in "
+          f"{'no procedure' if not F['gate_overfit'] else ', '.join(F['gate_overfit'])}; under-confident (slope > 1.2, recalibrated "
+          f"probabilities are primary) in {'no procedure' if not F['gate_recalibrate'] else ', '.join(F['gate_recalibrate'])}.", ""]
     return "\n".join(L)

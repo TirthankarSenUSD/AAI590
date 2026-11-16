@@ -77,7 +77,7 @@ Configurations are scored in parallel worker processes (`farm.n_jobs`; `auto` me
 | `procedure_winners` | The winner per procedure and split |
 | `procedure_summary` | Mean and corrected 95% CI per procedure |
 | `winner_stability` | How often the same configuration, member and representation win |
-| `overfit_gate` | The gate applied to every procedure |
+| `overfit_gate` | The gate applied to every procedure: `overfit` (train-CV gap above 0.05 or slope below 0.8), `recalibrate` (slope above 1.2: recalibrated probabilities are primary) or `pass`. Report only; it never removes a configuration from selection. |
 | `paired_comparisons` | Each procedure against the age-only floor; C+RNA against C; strict-clinical against C |
 | `subgroup_metrics`, `reliability` | For the arm procedures |
 | `regression_floor` | Provisional, until the final model |
