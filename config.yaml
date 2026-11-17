@@ -54,26 +54,49 @@ harness:
 farm:
   n_jobs: auto                      # auto = logical cores - 1 (at least 1); or an integer
   members: [logreg_en, svm_rbf, random_forest, xgboost, mlp, mlp_embed, multimodal]   # 3a classical + 3b neural
-  n_permutations: 10                # permutation test of the full C|best procedure (all members); low budget (F-043)
-  arms:
+  n_permutations: 3                 # permutation test of the full <permutation_arm>|best procedure; low budget (F-043, F-046)
+  permutation_arm: DNA              # 3c: exercises the new DNA representations; C|best passed in 3b (F-045)
+  arms:                             # rna_reps / dna_reps default to every representation; neural: false defers the
+                                    # neural members on that arm to final testing (F-046)
     C: {blocks: [clinical]}
-    C+RNA: {blocks: [clinical, rna]}
+    C+RNA: {blocks: [clinical, rna], rna_reps: [all, top15, top30, top50, pca10, pca30, hallmark, reactome, modules, dae8, dae32]}
     strict_clinical: {blocks: [clinical], drop: [molecular_derived]}
+    C+DNA: {blocks: [clinical, dna], dna_reps: [flags, known5, count, pathway, bagemb], neural: false}
+    C+RNA+DNA: {blocks: [clinical, rna, dna], rna_reps: [pca10, hallmark], dna_reps: [flags, known5, pathway], neural: false}
+    RNA: {blocks: [rna], rna_reps: [all, top30, pca10, hallmark, modules, dae8], neural: false}
+    RNA+DNA: {blocks: [rna, dna], rna_reps: [pca10, hallmark], dna_reps: [flags, known5, pathway], neural: false}
+    DNA: {blocks: [dna], dna_reps: [flags, known5, count, pathway, bagemb], neural: false}
   # one column per concept (F-039): oncotree_code == cancer_type_detailed, which
   # tumor_other_histologic_subtype determines; cancer_type has one sarcoma; NPI is a composite of
   # size, nodes and grade (floor only)
   drop_clinical: [oncotree_code, cancer_type_detailed, cancer_type, nottingham_prognostic_index]
   rare_level_min_count: 20          # rarer categorical levels are pooled inside the fold
-  rna_representations:              # C+RNA arm only; all fitted inside the fold
+  rna_representations:              # all fitted inside the fold; none reads the outcome except top-k selection
     all: {}                         # all 489 genes; linear members penalise them harder via rna_scale
     top15: {topk: 15}
     top30: {topk: 30}
     top50: {topk: 50}
     pca10: {pca: 10}
     pca30: {pca: 30}
+    hallmark: {sets: hallmark}      # one score per Hallmark set (mean z of its matched genes)
+    reactome: {sets: reactome}      # one score per Reactome set with enough matched genes
+    modules: {modules: true}        # co-expression modules found on the fitting rows
+    dae8: {dae: 8}                  # denoising-autoencoder latent (8 dims)
+    dae32: {dae: 32}                # denoising-autoencoder latent (32 dims)
+  gene_set_scores: {hallmark_min_rna: 5, reactome_min_rna: 10}   # Hallmark: the 5-gene minimum; Reactome: 10 (334 sets)
+  modules: {distance_cut: 0.7, min_size: 5}                      # average linkage on 1 - |r|
+  dae: {hidden: 128, mask: 0.2, weight_decay: 0.0001, lr: 0.001, max_epochs: 150, patience: 10, batch_size: 128,
+        val_fraction: 0.15, n_seeds: 2}                          # best seed by held-out reconstruction loss
+  ae_members: [logreg_en, svm_rbf, xgboost]                      # autoencoder latents offered to these (PLAN section 5)
+  dna_representations:              # from the 173 binary mutation flags; all unsupervised
+    flags: {}                       # all 173 flags
+    known5: {known: [tp53_mut, pik3ca_mut, gata3_mut, cdh1_mut, map3k1_mut]}
+    count: {count: true}            # number of mutated genes among the 173
+    pathway: {pathway: hallmark, min_dna: 3}                     # 25 Hallmark sets: any gene mutated
+    bagemb: {embed: 8}              # bag-of-mutations: co-occurrence gene vectors (SVD), averaged per patient
   rna_scale: 0.5                    # standardised genes x 0.5 = 4x the L2 penalty of clinical columns
   topk_selection: {n_subsamples: 10, fraction: 0.5, C: 0.05}   # selection frequency under L1 logistic regression
-  complexity_rule: "member family first (logreg < svm_rbf < random_forest = xgboost), then fewer RNA inputs, then stronger regularisation"
+  complexity_rule: "member family first (logreg < svm_rbf < random_forest = xgboost < mlp = mlp_embed < multimodal), then fewer omics inputs, then stronger regularisation"
   grids:
     logreg_en: {C: [0.01, 0.1, 1.0], l1_ratio: [0.0, 0.5, 1.0]}
     svm_rbf: {C: [0.1, 1.0, 10.0], gamma: [scale]}

@@ -70,19 +70,56 @@ def column_groups(cfg, arm: str) -> dict[str, list[str]]:
     drop = set(fc["drop_clinical"])
     for g in a.get("drop", []):
         drop |= set(cfg["groups"][g])
-    keep = [c for c in cfg.blocks["clinical"] if c not in drop]
+    keep = [c for c in cfg.blocks["clinical"] if c not in drop] if "clinical" in a["blocks"] else []
     groups = {"numeric": [c for c in types["numeric"] + types["ordinal"] if c in keep],
               "binary": [c for c in types["binary"] if c in keep],
               "categorical": [c for c in types["categorical"] if c in keep],
-              "rna": list(cfg.blocks["rna"]) if "rna" in a["blocks"] else []}
+              "rna": list(cfg.blocks["rna"]) if "rna" in a["blocks"] else [],
+              "dna": list(cfg.blocks["dna"]) if "dna" in a["blocks"] else []}
     assert set(groups["numeric"] + groups["binary"] + groups["categorical"]) == set(keep)
     return groups
 
 
+_SET_CACHE: dict = {}
+
+
+def gene_set_positions(cfg, source: str, block: str, min_genes: int) -> tuple[list[list[int]], list[str]]:
+    """Positions (within the RNA or DNA block) of the matched genes of every `source` gene set
+    with at least `min_genes` matched genes in that block, from the frozen crosswalk tables."""
+    key = (str(cfg.root), source, block, min_genes)
+    if key not in _SET_CACHE:
+        from ..crosswalk import GeneSetIndex
+        idx = GeneSetIndex(cfg)
+        pos = {c: i for i, c in enumerate(cfg.blocks[block])}
+        col = "n_rna_matched" if block == "rna" else "n_dna_matched"
+        s = idx.summary[(idx.summary.source == source) & (idx.summary[col] >= min_genes)]
+        m = idx.membership[(idx.membership.source == source) & (idx.membership.block == block)]
+        groups = m.groupby("set").column.apply(list)
+        sets = [[pos[c] for c in groups[name]] for name in s.set]
+        _SET_CACHE[key] = (sets, list(s.set))
+    return _SET_CACHE[key]
+
+
 def rna_transformer(rep: dict, kind: str, cfg, seed: int, rna_scale: float | None):
-    sel = cfg["farm"]["topk_selection"]
+    from .representations import DenoisingAE, GeneSetScorer, ModuleScorer
+    fc = cfg["farm"]
+    sel = fc["topk_selection"]
     steps = []
-    if "topk" in rep:
+    if "sets" in rep:
+        gs = fc["gene_set_scores"]
+        sets, names = gene_set_positions(cfg, rep["sets"], "rna", gs[f"{rep['sets']}_min_rna"])
+        steps.append(GeneSetScorer(sets, names))
+        if kind == "linear":
+            steps.append(StandardScaler())
+    elif "modules" in rep:
+        steps.append(ModuleScorer(fc["modules"]["distance_cut"], fc["modules"]["min_size"]))
+        if kind == "linear":
+            steps.append(StandardScaler())
+    elif "dae" in rep:
+        steps.append(DenoisingAE(latent=rep["dae"], random_state=seed, **fc["dae"]))
+        if kind == "linear":
+            steps.append(StandardScaler())
+    elif "topk" in rep:
         steps.append(FrequencySelector(rep["topk"], sel["n_subsamples"], sel["fraction"], sel["C"], seed))
         if kind == "linear":
             steps.append(StandardScaler())
@@ -97,7 +134,24 @@ def rna_transformer(rep: dict, kind: str, cfg, seed: int, rna_scale: float | Non
     return make_pipeline(*steps) if steps else "passthrough"
 
 
-def preprocessor(groups: dict, kind: str, rep: dict | None, cfg, seed: int, rna_scale: float | None = None):
+def dna_transformer(rep: dict, kind: str, cfg):
+    from .representations import ColumnSubset, CooccurrenceEmbedding, MutationCount, PathwayFlags
+    dna = list(cfg.blocks["dna"])
+    if "known" in rep:
+        return ColumnSubset([dna.index(c) for c in rep["known"]])
+    if "count" in rep:
+        return make_pipeline(MutationCount(), StandardScaler()) if kind == "linear" else MutationCount()
+    if "pathway" in rep:
+        sets, _ = gene_set_positions(cfg, rep["pathway"], "dna", rep["min_dna"])
+        return PathwayFlags(sets)
+    if "embed" in rep:
+        e = CooccurrenceEmbedding(rep["embed"], cfg.seed)
+        return make_pipeline(e, StandardScaler()) if kind == "linear" else e
+    return "passthrough"                                # all 173 flags
+
+
+def preprocessor(groups: dict, kind: str, rep: dict | None, cfg, seed: int, rna_scale: float | None = None,
+                 dna_rep: dict | None = None):
     """kind 'linear': median fill + missing flags + scaling, one-hot categories (A1, A12).
     kind 'tree': numbers passed with gaps (native handling), categories as ordinal codes.
     kind 'embed': as 'linear' for numbers and RNA, but categories as integer codes placed last
@@ -121,6 +175,8 @@ def preprocessor(groups: dict, kind: str, rep: dict | None, cfg, seed: int, rna_
             parts.append(("bin", "passthrough", groups["binary"]))
         if groups["rna"]:
             parts.append(("rna", rna_transformer(rep or {}, "linear", cfg, seed, rna_scale), groups["rna"]))
+        if groups.get("dna"):
+            parts.append(("dna", dna_transformer(dna_rep or {}, "linear", cfg), groups["dna"]))
         if groups["categorical"]:
             parts.append(("cat", make_pipeline(CategoricalAsString(),
                                                OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1,
@@ -137,6 +193,8 @@ def preprocessor(groups: dict, kind: str, rep: dict | None, cfg, seed: int, rna_
                                                               min_frequency=rare)), groups["categorical"]))
     if groups["binary"]:
         parts.append(("bin", "passthrough", groups["binary"]))
+    if groups.get("dna"):
+        parts.append(("dna", dna_transformer(dna_rep or {}, kind, cfg), groups["dna"]))
     if groups["rna"]:                                      # RNA last (the multimodal member relies on this)
         parts.append(("rna", rna_transformer(rep or {}, kind, cfg, seed, rna_scale), groups["rna"]))
     return ColumnTransformer(parts, remainder="drop", verbose_feature_names_out=False)

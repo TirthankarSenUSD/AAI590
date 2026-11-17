@@ -34,4 +34,5 @@ def tmp_project(tmp_path, cfg) -> Config:
     (root / "run.py").write_text("# root marker", encoding="utf-8")
     (root / "data").mkdir()
     shutil.copyfile(cfg.path("data"), root / "data" / Path(cfg.raw["paths"]["data"]).name)
+    shutil.copytree(cfg.path("reference"), root / "reference")        # gene sets + built crosswalk
     return Config(root=root, raw=yaml.safe_load(text))

@@ -137,6 +137,13 @@ def _score_candidate(c: Candidate, X: pd.DataFrame, y: pd.Series, splits: list[S
     return recs, preds
 
 
+def _score_group(cands: list[Candidate], X: pd.DataFrame, y: pd.Series, kw: dict):
+    """Several candidates in one worker, in order (unit of parallel work when grouped)."""
+    cols = list(dict.fromkeys(c for cand in cands for c in cand.columns))
+    Xg = X[cols]
+    return [_score_candidate(c, Xg[c.columns], y, **kw) for c in cands]
+
+
 _ID_COLS = ("candidate", "split_id", "repeat", "outer_fold", "complexity", "eligible")
 
 
@@ -186,7 +193,7 @@ class Harness:
         return _proba(est, cand, self.X, rows)
 
     def evaluate(self, candidates: list[Candidate], y: pd.Series | None = None, select: bool = False,
-                 light: bool = False, n_jobs: int = 1) -> Result:
+                 light: bool = False, n_jobs: int = 1, groups: list[list[int]] | None = None) -> Result:
         """Score every candidate on every frozen split. `light` skips the inner layer (used by the
         permutation test when no selection is needed). `select` also scores the select-the-best
         procedure, choosing inside each outer training fold by the fixed rule.
@@ -196,13 +203,19 @@ class Harness:
         the output is identical for any n_jobs."""
         y = self.y if y is None else y.astype(int)
         kw = dict(splits=self.splits, h=self.h, light=light, need_inner=(not light) or select)
-        if n_jobs == 1 or len(candidates) == 1:
-            outs = [_score_candidate(c, self.X[c.columns], y, **kw) for c in candidates]
+        # `groups`: candidate indices that must run in the same worker (e.g. sharing a cached,
+        # unsupervised representation). Results are always assembled in candidate order.
+        groups = groups or [[i] for i in range(len(candidates))]
+        assert sorted(i for g in groups for i in g) == list(range(len(candidates))), "groups must partition candidates"
+        if n_jobs == 1 or len(groups) == 1:
+            gouts = [_score_group([candidates[i] for i in g], self.X, y, kw) for g in groups]
         else:
             from joblib import Parallel, delayed, parallel_config
             with parallel_config(backend="loky", inner_max_num_threads=1):
-                outs = Parallel(n_jobs=n_jobs)(delayed(_score_candidate)(c, self.X[c.columns], y, **kw)
-                                               for c in candidates)
+                gouts = Parallel(n_jobs=n_jobs)(delayed(_score_group)([candidates[i] for i in g], self.X, y, kw)
+                                                for g in groups)
+        by_idx = {i: o for g, go in zip(groups, gouts) for i, o in zip(g, go)}
+        outs = [by_idx[i] for i in range(len(candidates))]
         folds = pd.DataFrame([r for recs, _ in outs for r in recs])
         preds = pd.concat([p for _, ps in outs for p in ps], ignore_index=True)
         sel = procedure(folds, [c.name for c in candidates], self.h["select_within_se"]) if select else pd.DataFrame()

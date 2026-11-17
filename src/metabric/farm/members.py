@@ -78,8 +78,52 @@ def _hyper_complexity(member: str, p: dict, grid: dict) -> float:
     return 0.0
 
 
-def _rna_inputs(rep: dict, n_rna: int) -> int:
-    return rep.get("topk") or rep.get("pca") or (n_rna if n_rna else 0)
+def _n_inputs(rna_rep: dict, dna_rep: dict, groups: dict, cfg) -> int:
+    """Number of omics inputs a representation feeds the model (for the "simpler" order)."""
+    n = 0
+    if groups["rna"]:
+        from .preprocess import gene_set_positions
+        if "sets" in rna_rep:
+            gs = cfg["farm"]["gene_set_scores"]
+            n += len(gene_set_positions(cfg, rna_rep["sets"], "rna", gs[f"{rna_rep['sets']}_min_rna"])[0])
+        elif "modules" in rna_rep:
+            n += 20                                         # data-dependent; a fixed nominal size
+        else:
+            n += rna_rep.get("topk") or rna_rep.get("pca") or rna_rep.get("dae") or len(groups["rna"])
+    if groups.get("dna"):
+        from .preprocess import gene_set_positions
+        if "known" in dna_rep:
+            n += len(dna_rep["known"])
+        elif "count" in dna_rep:
+            n += 1
+        elif "pathway" in dna_rep:
+            n += len(gene_set_positions(cfg, dna_rep["pathway"], "dna", dna_rep["min_dna"])[0])
+        elif "embed" in dna_rep:
+            n += dna_rep["embed"]
+        else:
+            n += len(groups["dna"])
+    return n
+
+
+def _arm_reps(fc: dict, arm: str, groups: dict, member: str) -> list[tuple[str, dict, str, dict]]:
+    """(rna name, rna rep, dna name, dna rep) combinations a member tries on an arm."""
+    a = fc["arms"][arm]
+    if groups["rna"]:
+        names = a.get("rna_reps", list(fc["rna_representations"]))
+        if member == "multimodal":
+            names = ["all"]                                 # one encoder over the full RNA block
+        elif member in NEURAL:
+            names = [n for n in fc["neural_rna_representations"] if n in names]
+        if member not in fc["ae_members"]:
+            names = [n for n in names if "dae" not in fc["rna_representations"][n]]
+        rna = [(n, fc["rna_representations"][n]) for n in names]
+    else:
+        rna = [("", {})]
+    if groups.get("dna"):
+        dna = [(n, fc["dna_representations"][n]) for n in a.get("dna_reps", list(fc["dna_representations"]))]
+    else:
+        dna = [("", {})]
+    return [(rn, rr, dn, dr) for rn, rr in rna for dn, dr in dna]
 
 
 def build_candidates(cfg, members=None, arms=None) -> tuple[list[Candidate], dict[str, Meta]]:
@@ -89,31 +133,29 @@ def build_candidates(cfg, members=None, arms=None) -> tuple[list[Candidate], dic
     cands, meta = [], {}
     for arm in arms:
         groups = column_groups(cfg, arm)
-        cols = groups["numeric"] + groups["binary"] + groups["categorical"] + groups["rna"]
-        all_reps = fc["rna_representations"] if groups["rna"] else {"none": {}}
+        cols = groups["numeric"] + groups["binary"] + groups["categorical"] + groups["rna"] + groups["dna"]
+        n_blocks = sum(bool(x) for x in (groups["numeric"] + groups["categorical"], groups["rna"], groups["dna"]))
         for member in members:
-            if member == "multimodal" and not groups["rna"]:
-                continue                                   # needs at least two data blocks
+            if member in NEURAL and not fc["arms"][arm].get("neural", True):
+                continue                                   # neural members deferred on this arm
+            if member == "multimodal" and (n_blocks < 2 or groups["dna"] or not groups["rna"]):
+                continue                                   # clinical + RNA encoders only (for now)
             grid = fc["grids"][member]
             keys = list(grid)
-            if member == "multimodal":
-                reps = {"all": {}}                         # one encoder over the full RNA block
-            elif member in NEURAL and groups["rna"]:
-                reps = {k: all_reps[k] for k in fc["neural_rna_representations"]}
-            else:
-                reps = all_reps
-            for rep_name, rep in reps.items():
+            for rna_name, rna_rep, dna_name, dna_rep in _arm_reps(fc, arm, groups, member):
+                rep_name = "+".join(x for x in (rna_name, dna_name) if x) or "none"
                 for values in itertools.product(*(grid[k] for k in keys)):
                     p = dict(zip(keys, values))
-                    scale = fc["rna_scale"] if member == "logreg_en" and rep_name == "all" else None
+                    scale = fc["rna_scale"] if member == "logreg_en" and rna_name == "all" else None
                     pstr = ",".join(f"{k}={v}" for k, v in p.items())
                     name = f"{arm}|{member}|{rep_name}|{pstr}"
 
-                    def make(member=member, p=p, rep=rep, groups=groups, scale=scale):
-                        return make_pipeline(preprocessor(groups, KIND[member], rep, cfg, seed, scale),
+                    def make(member=member, p=p, rr=rna_rep, dr=dna_rep, groups=groups, scale=scale):
+                        return make_pipeline(preprocessor(groups, KIND[member], rr, cfg, seed, scale, dr),
                                              _estimator(member, p, seed, groups, fc.get("neural")))
 
-                    complexity = FAMILY[member] * 1000 + _rna_inputs(rep, len(groups["rna"])) + _hyper_complexity(member, p, grid)
+                    complexity = (FAMILY[member] * 1000 + _n_inputs(rna_rep, dna_rep, groups, cfg)
+                                  + _hyper_complexity(member, p, grid))
                     cands.append(Candidate(name, make, cols, complexity, True, f"{member} on {arm} ({rep_name}; {pstr})"))
                     meta[name] = Meta(name, arm, member, rep_name, tuple(p.items()))
     return cands, meta
