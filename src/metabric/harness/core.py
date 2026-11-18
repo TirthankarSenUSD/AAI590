@@ -29,6 +29,7 @@ class Candidate:
     complexity: float = 0.0           # lower = simpler (1-SE rule)
     eligible: bool = True             # floors are never eligible to win
     label: str = ""
+    target: str = "binary"            # "cause": trained on alive / cancer death / other-cause death (scored as death)
 
 
 @dataclass
@@ -91,10 +92,24 @@ def _proba(est, cand: Candidate, X: pd.DataFrame, rows: pd.Index) -> np.ndarray:
     return est.predict_proba(X.loc[rows, cand.columns])[:, 1]
 
 
-def _score_candidate(c: Candidate, X: pd.DataFrame, y: pd.Series, splits: list[Split], h: dict,
+def _labels(c: Candidate, y: pd.Series) -> tuple[pd.Series, pd.Series]:
+    """(labels the candidate is fitted on, binary death labels used for every metric). `y` is either
+    binary death or the 3-class cause label (0 alive, 1 cancer death, 2 other-cause death); the cause
+    label is used only to fit "cause" candidates, never as an input and never for scoring."""
+    y = y.astype(int)
+    ybin = (y > 0).astype(int)
+    if c.target == "cause":
+        if y.max() < 2:
+            raise ValueError(f"{c.name} needs the 3-class cause label")
+        return y, ybin
+    return ybin, ybin
+
+
+def _score_candidate(c: Candidate, X: pd.DataFrame, y_in: pd.Series, splits: list[Split], h: dict,
                      light: bool, need_inner: bool) -> tuple[list[dict], list[pd.DataFrame]]:
     """One candidate on every split (the unit of parallel work). Everything is fitted on the
     split's training rows; the threshold and recalibrator only on inner out-of-fold predictions."""
+    yfit, y = _labels(c, y_in)
     recs, preds = [], []
     for s in splits:
         ytr, yte = y.loc[s.train], y.loc[s.test]
@@ -106,7 +121,7 @@ def _score_candidate(c: Candidate, X: pd.DataFrame, y: pd.Series, splits: list[S
             oof = pd.Series(np.nan, index=s.train)
             aucs, lls, brs = [], [], []
             for tr, va in s.inner:
-                p_va = _proba(_fit(c, X, tr, y), c, X, va)
+                p_va = _proba(_fit(c, X, tr, yfit), c, X, va)
                 oof.loc[va] = p_va
                 yv = y.loc[va].to_numpy()
                 aucs.append(roc_auc_score(yv, p_va) if yv.min() != yv.max() else np.nan)
@@ -116,7 +131,7 @@ def _score_candidate(c: Candidate, X: pd.DataFrame, y: pd.Series, splits: list[S
             rec.update(inner_auroc=float(np.nanmean(aucs)),
                        inner_auroc_se=float(np.nanstd(aucs, ddof=1) / np.sqrt(len(aucs))),
                        inner_log_loss=float(np.mean(lls)), inner_brier=float(np.mean(brs)))
-        est = _fit(c, X, s.train, y)
+        est = _fit(c, X, s.train, yfit)
         p_te, p_tr = _proba(est, c, X, s.test), _proba(est, c, X, s.train)
         m = M.binary_metrics(yte, p_te, prev)
         rec.update(m)
@@ -147,21 +162,36 @@ class _Progress:
     """Progress lines for long evaluations: every 5% of tasks or every 2 minutes, with an ETA."""
 
     def __init__(self, n: int, log, label: str):
+        import threading
         import time
         self.n, self.log, self.label, self.done = n, log, label, 0
-        self.t0 = self.last = time.time()
+        self.t0 = self.last = self.last_tick = time.time()
         self.step = max(1, n // 20)
+        self._stop = threading.Event()
+        if log:                                   # heartbeat: shows long stretches without a finished task
+            threading.Thread(target=self._beat, daemon=True).start()
+
+    def _beat(self):
+        import time
+        while not self._stop.wait(300):
+            if self.done >= self.n:
+                return
+            if time.time() - self.last_tick >= 300:
+                self.log(f"{self.label}: still running, {self.done}/{self.n} tasks done, "
+                         f"elapsed {(time.time() - self.t0) / 60:.1f} min (no task finished in the last 5 min)")
 
     def tick(self):
         import time
         self.done += 1
-        now = time.time()
+        now = self.last_tick = time.time()
         if self.log and (self.done % self.step == 0 or now - self.last >= 120 or self.done == self.n):
             el = now - self.t0
             eta = el / self.done * (self.n - self.done)
             self.log(f"{self.label}: {self.done}/{self.n} tasks ({100 * self.done / self.n:.0f}%), "
-                     f"elapsed {el / 60:.1f} min, ETA {eta / 60:.1f} min")
+                     f"elapsed {el / 60:.1f} min, ETA {eta / 60:.1f} min (rough: tasks differ in cost)")
             self.last = now
+        if self.done >= self.n:
+            self._stop.set()
 
 
 _ID_COLS = ("candidate", "split_id", "repeat", "outer_fold", "complexity", "eligible")
@@ -198,8 +228,16 @@ class Result:
 
 
 class Harness:
-    def __init__(self, cfg, X: pd.DataFrame, y: pd.Series, splits: list[Split]):
+    def __init__(self, cfg, X: pd.DataFrame, y: pd.Series, splits: list[Split], y_cause: pd.Series | None = None):
+        """`y`: binary death. `y_cause` (optional): 0 alive / 1 cancer death / 2 other-cause death, used
+        only to fit cause-specific candidates; it must agree with `y` (death = cause > 0)."""
         self.cfg, self.X, self.y, self.splits = cfg, X, y.astype(int), splits
+        self.y_cause = None
+        if y_cause is not None:
+            yc = y_cause.loc[y.index].astype(int)
+            if not ((yc > 0).astype(int) == self.y).all():
+                raise ValueError("cause label disagrees with the death label")
+            self.y_cause = yc
         self.h = cfg["harness"]
         check_split_hygiene(splits, X.index)
         self.n_train = float(np.mean([len(s.train) for s in splits]))
@@ -222,7 +260,8 @@ class Harness:
         `n_jobs > 1` scores candidates in parallel worker processes, one thread each (no
         oversubscription). Every fit is seeded and results are assembled in candidate order, so
         the output is identical for any n_jobs."""
-        y = self.y if y is None else y.astype(int)
+        # labels: the cause label when available (cause candidates fit on it; everything is scored on death)
+        y = (self.y_cause if self.y_cause is not None else self.y) if y is None else y.astype(int)
         kw = dict(splits=self.splits, h=self.h, light=light, need_inner=(not light) or select)
         # `groups`: candidate indices that must run in the same worker (e.g. sharing a cached,
         # unsupervised representation). Results are always assembled in candidate order.
@@ -350,10 +389,11 @@ class Harness:
     def permutation_test(self, procedure: Callable[[pd.Series], float], n_perm: int,
                          rng: np.random.Generator) -> tuple[pd.DataFrame, dict]:
         """Run the full `procedure` on shuffled labels. It must score at chance (A6)."""
-        obs = procedure(self.y)
+        labels = self.y_cause if self.y_cause is not None else self.y   # permute the full label (cause included)
+        obs = procedure(labels)
         perm = []
         for i in range(n_perm):
-            yp = pd.Series(rng.permutation(self.y.to_numpy()), index=self.y.index)
+            yp = pd.Series(rng.permutation(labels.to_numpy()), index=labels.index)
             perm.append({"permutation": i, "auroc": procedure(yp)})
         pt = pd.DataFrame(perm)
         band = self.h["chance_band"]

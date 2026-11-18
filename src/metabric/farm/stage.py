@@ -53,9 +53,15 @@ def run_farm(cfg: Config, run: Run, members=None, arms=None) -> dict:
     for name in ("gene_set_summary.csv", "gene_set_membership.csv"):     # gene-set and pathway representations
         if (cfg.path("crosswalk") / name).is_file():
             run.record_input(cfg.path("crosswalk") / name, "gene crosswalk table (read-only)")
-    H = Harness(cfg, design_matrix(ds), ds.y, splits_from_table(load_cv_splits(cfg, tr)))
     n_jobs = resolve_n_jobs(cfg)
     cands, meta = build_candidates(cfg, members, arms)
+    y_cause = None
+    if any(c.target == "cause" for c in cands):      # training-only label for cause-specific members
+        from .cause import cause_labels
+        y_cause = cause_labels(ds.frame)
+    X = design_matrix(ds)
+    assert "death_from_cancer" not in X.columns and "overall_survival" not in X.columns
+    H = Harness(cfg, X, ds.y, splits_from_table(load_cv_splits(cfg, tr)), y_cause=y_cause)
     floors = floor_candidates(cfg)
     arms = arms or list(cfg["farm"]["arms"])
     members = members or cfg["farm"]["members"]
@@ -81,6 +87,16 @@ def run_farm(cfg: Config, run: Run, members=None, arms=None) -> dict:
             if names:                                  # e.g. multimodal exists only on multi-block arms
                 procs[f"{arm}|{member}"] = names
         procs[f"{arm}|best"] = [n for n, m in meta.items() if m.arm == arm]
+    # binary counterparts restricted to the cause members' representations (like-for-like inputs)
+    from .members import CAUSE
+    matched = {}
+    for arm in arms:
+        for cm, bm in CAUSE.items():
+            cause_reps = {m.rep for m in meta.values() if m.arm == arm and m.member == cm}
+            names = [n for n, m in meta.items() if m.arm == arm and m.member == bm and m.rep in cause_reps]
+            if cause_reps and names and len(names) < len([n for n, m in meta.items() if m.arm == arm and m.member == bm]):
+                matched[f"{arm}|{bm}@cause_reps"] = names
+    procs.update(matched)
     # representation procedures: the best member for one representation, chosen inside the fold
     rep_procs = {}
     for arm in arms:
@@ -133,6 +149,12 @@ def run_farm(cfg: Config, run: Run, members=None, arms=None) -> dict:
             pair(f"C+RNA|{m}", f"C|{m}", "adding RNA (C+RNA vs C)")
         if f"strict_clinical|{m}" in procs and f"C|{m}" in procs:
             pair(f"strict_clinical|{m}", f"C|{m}", "dropping molecular-derived clinical columns (strict vs C)")
+    # cause-specific members against their binary counterparts (same arm, same splits)
+    for arm in arms:
+        for cm, bm in CAUSE.items():
+            base = f"{arm}|{bm}@cause_reps" if f"{arm}|{bm}@cause_reps" in procs else f"{arm}|{bm}"
+            if f"{arm}|{cm}" in procs and base in procs:
+                pair(f"{arm}|{cm}", base, "cause-specific vs binary training label (same inputs)")
     # the omics question: each arm against the arm without the added block
     for a_arm, b_proc, label in [("C+DNA", "C|best", "adding DNA (C+DNA vs C)"),
                                  ("C+RNA+DNA", "C+RNA|best", "adding DNA to C+RNA (C+RNA+DNA vs C+RNA)"),

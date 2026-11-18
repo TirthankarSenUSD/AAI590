@@ -45,7 +45,8 @@ def test_h_statistic_separates_interaction_from_additive():
     X, _ = _xy(n=40)
     h_int = E.h_statistic(_Fixed("interaction"), X, ["a", "b"]).h2.iloc[0]
     h_add = E.h_statistic(_Fixed("additive"), X, ["a", "b"]).h2.iloc[0]
-    assert h_int > 0.5 and h_add < 0.05
+    assert h_int > 0.5 and h_add < 1e-9                  # additive in log-odds -> exactly 0
+    assert E.h_statistic(_Fixed("additive"), X, ["a", "a", "b"]).shape[0] == 1   # duplicates never paired
 
 
 def test_gene_groups_join_correlated_genes_only():
@@ -115,3 +116,14 @@ def test_importance_stage_end_to_end_small(tmp_project):
     assert (r2.dir / "importance" / "tables" / "importance_summary.md").is_file()
     mod = pd.read_csv(r2.dir / "importance" / "tables" / "modality_importance.csv")
     assert {"C+RNA+DNA", "C"} <= set(mod.arm) and "all DNA" in set(mod.group)
+    top = pd.read_csv(r2.dir / "importance" / "tables" / "top_features.csv")
+    assert not top.duplicated(["arm", "feature"]).any()                        # one entry per feature
+    h = pd.read_csv(r2.dir / "importance" / "tables" / "interactions.csv")
+    assert (h.feature_a != h.feature_b).all()
+    r3 = Run(c, "importance --reuse", run_id="imp_reuse")                     # reuse pass 1: same summaries
+    facts3 = run_importance(c, r3, reuse="imp_small")
+    r3.finalize()
+    a1 = pd.read_csv(r2.dir / "importance" / "tables" / "permutation_summary.csv")
+    a3 = pd.read_csv(r3.dir / "importance" / "tables" / "permutation_summary.csv")
+    pd.testing.assert_frame_equal(a1, a3, check_exact=False, rtol=1e-9, atol=1e-12)
+    assert facts3["top"] == facts["top"]

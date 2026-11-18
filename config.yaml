@@ -54,8 +54,8 @@ harness:
 farm:
   n_jobs: auto                      # auto = logical cores - 1 (at least 1); or an integer
   members: [logreg_en, svm_rbf, random_forest, xgboost, mlp, mlp_embed, multimodal]   # 3a classical + 3b neural
-  n_permutations: 3                 # permutation test of the full <permutation_arm>|best procedure; low budget (F-043, F-046)
-  permutation_arm: DNA              # 3c: exercises the new DNA representations; C|best passed in 3b (F-045)
+  n_permutations: 10                # permutation test of the full <permutation_arm>|best procedure (F-043, F-046, F-053)
+  permutation_arm: C                # cause-specific pass: the C arm exercises the new cause label (F-053)
   arms:                             # rna_reps / dna_reps default to every representation; neural: false defers the
                                     # neural members on that arm to final testing (F-046)
     C: {blocks: [clinical]}
@@ -87,7 +87,7 @@ farm:
   modules: {distance_cut: 0.7, min_size: 5}                      # average linkage on 1 - |r|
   dae: {hidden: 128, mask: 0.2, weight_decay: 0.0001, lr: 0.001, max_epochs: 150, patience: 10, batch_size: 128,
         val_fraction: 0.15, n_seeds: 2}                          # best seed by held-out reconstruction loss
-  ae_members: [logreg_en, svm_rbf, xgboost]                      # autoencoder latents offered to these (PLAN section 5)
+  ae_members: [logreg_en, svm_rbf, xgboost, logreg_cause, xgboost_cause]   # autoencoder latents offered to these
   dna_representations:              # from the 173 binary mutation flags; all unsupervised
     flags: {}                       # all 173 flags
     known5: {known: [tp53_mut, pik3ca_mut, gata3_mut, cdh1_mut, map3k1_mut]}
@@ -106,6 +106,11 @@ farm:
     mlp: {hidden: [[32], [64, 32]], dropout: [0.3], weight_decay: [0.001]}
     mlp_embed: {hidden: [[32], [64, 32]], dropout: [0.3], weight_decay: [0.001]}
     multimodal: {block_dropout: [0.1, 0.3], dropout: [0.3], weight_decay: [0.001]}
+    logreg_cause: {C: [0.01, 0.1, 1.0], l1_ratio: [0.0, 0.5, 1.0]}          # same grid as logreg_en
+    xgboost_cause: {n_estimators: [300], learning_rate: [0.05], max_depth: [2, 4], subsample: [0.8],
+                    colsample_bytree: [0.5, 0.8], min_child_weight: [5]}  # same grid as xgboost
+  cause_arms: [C, C+RNA, strict_clinical]       # cause-specific members (death_from_cancer as training-only label)
+  cause_rna_representations: [pca10, dae8]      # their RNA representations on C+RNA (fixed a priori)
   neural_rna_representations: [all, pca10]      # mlp / mlp_embed on C+RNA (multimodal always uses all genes)
   neural:                                       # shared training settings for the three neural members
     lr: 0.001

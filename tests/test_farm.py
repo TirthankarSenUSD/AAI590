@@ -104,7 +104,7 @@ def test_run_farm_end_to_end_small(tmp_project):
     c, _, _ = make_cv_splits(c, ds.subset(training_ids(c, ds)))
     f = c.raw["farm"]
     f.update(n_jobs=2, n_permutations=2, neural_rna_representations=["pca10"], permutation_arm="C",
-             grids={"logreg_en": {"C": [0.1], "l1_ratio": [0.0]},
+             grids={"logreg_en": {"C": [0.1], "l1_ratio": [0.0]}, "logreg_cause": {"C": [0.1], "l1_ratio": [0.0]},
                     "mlp": {"hidden": [[8]], "dropout": [0.3], "weight_decay": [0.001]},
                     "multimodal": {"block_dropout": [0.1], "dropout": [0.3], "weight_decay": [0.001]}},
              neural={**f["neural"], "max_epochs": 3, "n_seeds": 1}, dae={**f["dae"], "max_epochs": 3, "n_seeds": 1})
@@ -112,10 +112,13 @@ def test_run_farm_end_to_end_small(tmp_project):
     f["arms"]["C+DNA"]["dna_reps"] = ["known5", "bagemb"]
     c.raw["harness"].update(n_boot=10, chance_band=0.5)        # 2 shuffles: only the plumbing is tested here
     run = Run(c, "test farm", run_id="farm_test")
-    facts = run_farm(c, run, members=["logreg_en", "mlp", "multimodal"], arms=["C", "C+RNA", "C+DNA"])
+    facts = run_farm(c, run, members=["logreg_en", "logreg_cause", "mlp", "multimodal"], arms=["C", "C+RNA", "C+DNA"])
     run.finalize()
     assert "C|multimodal" not in facts and "C+RNA|multimodal" in facts and "C+RNA|best" in facts
     assert "C+DNA|mlp" not in facts and "C+DNA|best" in facts                 # neural deferred on DNA arms
     assert facts["representations_tested"] == 5 + 2      # C+RNA: 4 reps + "all" (multimodal); C+DNA: 2 reps
+    assert "C|logreg_cause" in facts and "C+DNA|logreg_cause" not in facts    # cause members only on cause_arms
+    pairs = pd.read_csv(run.dir / "farm" / "tables" / "paired_comparisons.csv")
+    assert {"C|logreg_cause", "C+RNA|logreg_cause"} <= set(pairs[pairs.comparison.str.startswith("cause-specific")].a)
     assert facts["permutation"]["n_permutations"] == 2
     assert (run.dir / "farm" / "tables" / "farm_summary.md").is_file()

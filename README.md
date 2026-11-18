@@ -16,8 +16,9 @@ A reproducible machine-learning pipeline that predicts overall survival in breas
 | 3a | Model farm: classical members (logistic regression, SVM, random forest, XGBoost) | done |
 | 3b | Model farm: neural members (MLP, MLP with embeddings, multimodal) | done |
 | 3c | Model farm: all eight data arms, RNA and DNA representations | done |
-| 4 | Gates and importance | next |
-| 5–7 | Ensemble, model-agreement analysis, report | planned |
+| 4 | Gates and importance | done |
+| 5 | Ensemble | next |
+| 6–7 | Model-agreement analysis, report | planned |
 
 ## Pipeline stages
 
@@ -61,7 +62,8 @@ Each stage lives in its own folder under `src/metabric/`, with a `README.md` tha
 │   ├── eda/                exploratory data analysis
 │   ├── harness/            evaluation harness and floors
 │   ├── farm/              model farm (seven members)
-│   └── importance/ ensemble/ agreement/ report/ phase2/   (planned)
+│   ├── importance/        gates and feature importance
+│   └── ensemble/ agreement/ report/ phase2/   (planned)
 ├── tests/                  test suite (pytest)
 ├── data/                   METABRIC_RNA_Mutation.csv (read-only)
 ├── reference/              gene-set files; crosswalk/ is built from them
@@ -93,7 +95,8 @@ python run.py holdout            # create the frozen holdout (once only; refuses
 python run.py splits             # create the frozen nested CV splits (once only; refuses if they exist)
 python run.py eda --mode both    # EDA: descriptive (all patients) and modelling (training rows only)
 python run.py harness            # baselines ("floors") through the nested cross-validation
-python run.py farm               # model farm through the same nested cross-validation (about 1 h on 8 cores)
+python run.py farm               # model farm through the same nested cross-validation (about 3.5 h on 8 cores)
+python run.py importance         # gates and feature importance of the farm winners (about 2.5 h; --reuse RUN_ID: 15 min)
 python -m pytest -q              # run the test suite (about 3 min)
 ```
 

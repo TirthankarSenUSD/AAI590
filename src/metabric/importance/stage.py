@@ -54,7 +54,9 @@ def _check_config(cfg: Config, farm_dir) -> None:
 
 # ---------------------------------------------------------------------------------- worker tasks
 def _explain_task(key, cand, member, groups_clin, rna_cols, dna_cols, Xtr, ytr, Xte, yte, mode, s):
-    """Refit one winning configuration on one outer split and explain it on the test rows."""
+    """Refit one winning configuration on one outer split and explain it on the test rows. `ytr` is
+    the label the candidate is fitted on (the cause label for cause-specific members); `yte` is
+    binary death, used for every score."""
     pipe = cand.make().fit(Xtr[cand.columns], ytr.to_numpy())
     Xte_c = Xte[cand.columns]
     p = pipe.predict_proba(Xte_c)[:, 1]
@@ -82,7 +84,7 @@ def _explain_task(key, cand, member, groups_clin, rna_cols, dna_cols, Xtr, ytr, 
         if member in s["shap_members"]:
             out["shap"] = E.shap_by_source(pipe, member, Xtr[cand.columns], Xte_c, fm).rename("mean_abs_shap").reset_index() \
                 .rename(columns={"index": "source"})
-        if member == "logreg_en":
+        if member in ("logreg_en", "logreg_cause"):
             out["coef"] = E.lr_coefficients(pipe, fm)
     return out
 
@@ -91,6 +93,7 @@ def _detail_task(key, cand, cols_top, Xtr, ytr, Xte, yte, split_id, s):
     """Partial dependence, ICE (one split), H-statistic and learning curve for a best-member winner."""
     from sklearn.metrics import roc_auc_score
     pipe = cand.make().fit(Xtr[cand.columns], ytr.to_numpy())
+    ybin = (ytr > 0).astype(int)                          # learning-curve sampling and scores use death
     Xte_c, Xtr_c = Xte[cand.columns], Xtr[cand.columns]
     rng = np.random.default_rng([s["seed"], zlib.crc32(f"{key[0]}|{key[1]}|detail".encode())])
     feats = [c for c in cols_top if c in cand.columns]
@@ -107,11 +110,11 @@ def _detail_task(key, cand, cols_top, Xtr, ytr, Xte, yte, split_id, s):
         if f >= 1:
             idx = Xtr.index
         else:
-            idx = pd.Index(np.concatenate([rng.choice(ytr.index[ytr == v], int(round(f * (ytr == v).sum())), replace=False)
+            idx = pd.Index(np.concatenate([rng.choice(ybin.index[ybin == v], int(round(f * (ybin == v).sum())), replace=False)
                                            for v in (0, 1)]))
         m = cand.make().fit(Xtr.loc[idx, cand.columns], ytr.loc[idx].to_numpy())
         lc.append({"fraction": f, "n_train": len(idx), "cv_auroc": roc_auc_score(yte, m.predict_proba(Xte_c)[:, 1]),
-                   "train_auroc": roc_auc_score(ytr.loc[idx], m.predict_proba(Xtr.loc[idx, cand.columns])[:, 1])})
+                   "train_auroc": roc_auc_score(ybin.loc[idx], m.predict_proba(Xtr.loc[idx, cand.columns])[:, 1])})
     return {"key": key, "pdp": pdp, "ice": ice, "h": h, "lc": pd.DataFrame(lc)}
 
 
@@ -132,7 +135,13 @@ def _parallel(fn, tasks, n_jobs, log, label):
 
 
 # ---------------------------------------------------------------------------------------- stage
-def run_importance(cfg: Config, run: Run, farm_run: str | None = None) -> dict:
+REUSE_TABLES = ("refit_check", "modality_importance", "permutation_importance", "shap_values_by_split", "lr_coefficients")
+
+
+def run_importance(cfg: Config, run: Run, farm_run: str | None = None, reuse: str | None = None) -> dict:
+    """`reuse`: an earlier importance run on the same farm run whose per-split tables (pass 1: refits,
+    permutation importance, SHAP, coefficients) are reused, so only the summaries and the detail pass
+    are recomputed. The reused tables are recorded as inputs."""
     st = run.stage("importance")
     ic = cfg["importance"]
     farm_id = find_farm_run(cfg, farm_run)
@@ -147,6 +156,12 @@ def run_importance(cfg: Config, run: Run, farm_run: str | None = None) -> dict:
     run.record_input(cfg.path("cv_splits"), "frozen CV splits")
     ds = full.subset(tr_ids)
     X, y = design_matrix(ds), ds.y
+    y_cause = None
+    if any(m.member in ("logreg_cause", "xgboost_cause") for m in build_candidates(cfg, arms=list(ic["arms_full"]) +
+                                                                                     list(ic["arms_modality_only"]))[1].values()):
+        from ..farm.cause import cause_labels
+        y_cause = cause_labels(ds.frame)
+    fit_y = lambda cand, rows: (y_cause if cand.target == "cause" else y).loc[rows]  # noqa: E731
     splits = {s.split_id: s for s in splits_from_table(load_cv_splits(cfg, tr_ids))}
     arms = list(ic["arms_full"]) + list(ic["arms_modality_only"])
     cands, meta = build_candidates(cfg, arms=arms)
@@ -174,48 +189,72 @@ def run_importance(cfg: Config, run: Run, farm_run: str | None = None) -> dict:
             seen[key] = mode
             sp = splits[r.split_id]
             tasks.append([key, by_name[r.winner], meta[r.winner].member, clin, g["rna"], g["dna"],
-                          X.loc[sp.train], y.loc[sp.train], X.loc[sp.test], y.loc[sp.test], mode, s])
+                          X.loc[sp.train], fit_y(by_name[r.winner], sp.train), X.loc[sp.test], y.loc[sp.test], mode, s])
     for t in tasks:                                       # a task shared by a full and a modality arm runs in full
         t[10] = seen[t[0]]
     pk = pd.DataFrame(proc_keys)
-    st.log.info("importance: farm run %s; %d procedure-split rows -> %d unique refits; n_jobs=%d", farm_id, len(pk), len(tasks), n_jobs)
     t0 = time.time()
-    res = {r["key"]: r for r in _parallel(_explain_task, tasks, n_jobs, st.log.info, "explaining winners")}
-    st.log.info("winners explained in %.0f s", time.time() - t0)
+    if reuse:
+        src = cfg.path("outputs") / reuse / "importance" / "tables"
+        names = [n for n in REUSE_TABLES if (src / f"{n}.csv").is_file()]
+        if "shap_values_by_split" not in names:          # runs before this table existed: use their SHAP summary,
+            names.append("shap_summary")                 # which is exact for member procedures (one member each)
+        for name in names:
+            run.record_input(src / f"{name}.csv", f"pass-1 table reused from importance run {reuse}")
+        old = {name: pd.read_csv(src / f"{name}.csv") for name in names}
+        chk = old["refit_check"]
+        cmp = chk[["procedure", "split_id", "winner"]].merge(pk[["procedure", "split_id", "winner"]], how="outer", indicator=True)
+        if cmp["_merge"].ne("both").any():
+            raise RuntimeError(f"importance run {reuse} does not cover the same procedures and winners")
+        pk = chk
+        modality, perm, coef = old["modality_importance"], old["permutation_importance"], old["lr_coefficients"]
+        shap_t = old.get("shap_values_by_split")
+        shap_old = None
+        if shap_t is None:
+            shap_old = old["shap_summary"]
+            shap_old = shap_old[~shap_old.procedure.str.endswith("|best")].drop(columns=["member"], errors="ignore")
+        st.log.info("importance: farm run %s; reusing pass-1 tables of importance run %s (%d refits)", farm_id, reuse, len(tasks))
+    else:
+        st.log.info("importance: farm run %s; %d procedure-split rows -> %d unique refits; n_jobs=%d", farm_id, len(pk), len(tasks), n_jobs)
+        res = {r["key"]: r for r in _parallel(_explain_task, tasks, n_jobs, st.log.info, "explaining winners")}
+        st.log.info("winners explained in %.0f s", time.time() - t0)
+        pk["refit_auroc"] = [res[(w, sid)]["refit_auroc"] for w, sid in zip(pk.winner, pk.split_id)]
+        pk["abs_diff"] = (pk.refit_auroc - pk.farm_outer_auroc).abs()
 
-    # refit check: identical to the farm fit
-    pk["refit_auroc"] = [res[(w, sid)]["refit_auroc"] for w, sid in zip(pk.winner, pk.split_id)]
-    pk["abs_diff"] = (pk.refit_auroc - pk.farm_outer_auroc).abs()
+        def gather(kind):
+            parts = []
+            for r in pk.itertuples():
+                d = res[(r.winner, r.split_id)].get(kind)
+                if d is not None and len(d):
+                    parts.append(d.assign(arm=r.arm, procedure=r.procedure, member=r.member, split_id=r.split_id))
+            return pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
+
+        modality, perm, shap_t, coef = gather("modality"), gather("perm"), gather("shap"), gather("coef")
+        full_procs = pk.loc[pk["mode"] == "full", "procedure"].unique()
+        perm = perm[perm.procedure.isin(full_procs)]
+        # SHAP scales differ between members, so SHAP is summarised per member procedure only
+        shap_t = shap_t[shap_t.procedure.isin(full_procs) & ~shap_t.procedure.str.endswith("|best")] if len(shap_t) else shap_t
+        coef = coef[coef.procedure.str.endswith(("|logreg_en", "|logreg_cause"))] if len(coef) else coef
+        shap_old = None
     st.table("refit_check", pk, "Refitted winners reproduce the farm's outer AUROC (abs_diff must be ~0)")
     bad = pk[pk.abs_diff > 1e-6]
     if len(bad):
         raise RuntimeError(f"{len(bad)} refits do not reproduce the farm run:\n{bad.head().to_string()}")
-
-    def gather(kind):
-        parts = []
-        for r in pk.itertuples():
-            d = res[(r.winner, r.split_id)].get(kind)
-            if d is not None and len(d):
-                parts.append(d.assign(arm=r.arm, procedure=r.procedure, member=r.member, split_id=r.split_id))
-        return pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
-
     full_pk = pk[pk["mode"] == "full"]
-    modality = gather("modality")
     st.table("modality_importance", modality, "Grouped permutation importance by data block (AUROC drop when the whole block is shuffled)")
-    perm = gather("perm")
-    perm = perm[perm.procedure.isin(full_pk.procedure.unique())]
     st.table("permutation_importance", perm, "Permutation importance per procedure and split (AUROC drop; correlated genes shuffled together)")
     items = _items(perm)
-    summ = _summarise(items, "importance", ic["top_n"], ["arm", "procedure", "member"])
+    # summarised per procedure: a best-member procedure's winner can be a different member in each split
+    summ = _summarise(items, "importance", ic["top_n"], ["arm", "procedure"])
     st.table("permutation_summary", summ, f"Permutation importance across the 10 splits: mean, SD, mean rank, share of splits in the top {ic['top_n']}")
-    shap_t = gather("shap")
-    shap_t = shap_t[shap_t.procedure.isin(full_pk.procedure.unique())] if len(shap_t) else shap_t
-    shap_s = _summarise(shap_t.rename(columns={"source": "item"}), "mean_abs_shap", ic["top_n"], ["arm", "procedure", "member"]) \
-        if len(shap_t) else pd.DataFrame()
-    st.table("shap_summary", shap_s, "Mean |SHAP| per source across splits (exact: linear for logistic regression, TreeSHAP for trees; "
-             "scales differ by member, compare ranks)")
-    coef = gather("coef")
-    coef = coef[coef.procedure.str.endswith("|logreg_en")] if len(coef) else coef
+    if shap_t is not None:
+        st.table("shap_values_by_split", shap_t, "Mean |SHAP| per source, per member procedure and split")
+        shap_s = _summarise(shap_t.rename(columns={"source": "item"}), "mean_abs_shap", ic["top_n"], ["arm", "procedure"]) \
+            if len(shap_t) else pd.DataFrame()
+    else:
+        shap_s = shap_old
+    st.table("shap_summary", shap_s, "Mean |SHAP| per source across splits, member procedures only (exact: linear for logistic "
+             "regression, TreeSHAP for trees; scales differ by member, compare ranks)")
     st.table("lr_coefficients", coef, "Logistic regression coefficients per split (standardised inputs; one-hot levels as indicators)")
     coef_s = _coef_summary(coef)
     st.table("lr_coefficient_summary", coef_s, "Logistic regression coefficients across splits: mean, SD, sign consistency, odds ratio per unit")
@@ -231,8 +270,8 @@ def run_importance(cfg: Config, run: Run, farm_run: str | None = None) -> dict:
     for arm in ic["arms_full"]:
         for r in full_pk[full_pk.procedure == f"{arm}|best"].itertuples():
             sp = splits[r.split_id]
-            dtasks.append([(r.winner, r.split_id, arm), by_name[r.winner], top[arm], X.loc[sp.train], y.loc[sp.train],
-                           X.loc[sp.test], y.loc[sp.test], r.split_id, s])
+            dtasks.append([(r.winner, r.split_id, arm), by_name[r.winner], top[arm], X.loc[sp.train],
+                           fit_y(by_name[r.winner], sp.train), X.loc[sp.test], y.loc[sp.test], r.split_id, s])
             dkeys.append(r)
     t1 = time.time()
     dres = {r["key"]: r for r in _parallel(_detail_task, dtasks, n_jobs, st.log.info, "partial dependence and interactions")}
@@ -269,6 +308,7 @@ def _items(perm: pd.DataFrame) -> pd.DataFrame:
     """Expand gene groups so every gene carries its group's importance (shared credit); clinical
     columns and single genes are items of their own."""
     rows = []
+    perm = perm.drop(columns=[c for c in ("item", "group_size") if c in perm])
     for r in perm.itertuples():
         if r.group.startswith("genes: "):
             for g in r.group[7:].split(", "):
@@ -287,19 +327,24 @@ def _summarise(df: pd.DataFrame, value: str, top_n: int, by: list[str]) -> pd.Da
                                        mean_rank=("rank", "mean"), top_share=("rank", lambda r: float((r <= top_n).mean())))
     if "n_columns" in d:
         agg["n_columns"] = d.groupby(by + ["item"]).n_columns.max()
-    return agg.reset_index().sort_values(by + ["mean"], ascending=[True] * len(by) + [False])
+    agg = agg.reset_index()
+    agg["_m"] = agg["mean"].round(12)                    # ties (e.g. genes sharing a group) broken by name
+    return agg.sort_values(by + ["_m", "item"], ascending=[True] * len(by) + [False, True]).drop(columns="_m").reset_index(drop=True)
 
 
 def _coef_summary(coef: pd.DataFrame) -> pd.DataFrame:
     if coef.empty:
         return coef
-    g = coef.groupby(["arm", "feature", "source", "block"])
+    if "contrast" not in coef:
+        coef = coef.assign(contrast="death vs alive")
+    keys = ["arm", "procedure", "contrast", "feature", "source", "block"]
+    g = coef.groupby(keys)
     s = g.coef.agg(mean="mean", sd="std", n_splits="size").reset_index()
     sign = g.coef.apply(lambda c: float((np.sign(c) == np.sign(c.mean())).mean()) if c.mean() != 0 else 0.0).rename("sign_consistency")
-    s = s.merge(sign.reset_index(), on=["arm", "feature", "source", "block"])
+    s = s.merge(sign.reset_index(), on=keys)
     s["odds_ratio"] = np.exp(s["mean"])
     s["abs_mean"] = s["mean"].abs()
-    return s.sort_values(["arm", "abs_mean"], ascending=[True, False]).drop(columns="abs_mean")
+    return s.sort_values(["arm", "procedure", "contrast", "abs_mean"], ascending=[True, True, True, False]).drop(columns="abs_mean")
 
 
 def _figures(st, summ, coef_s, pdp, ice, hs, modality, lc, top, ic):
@@ -319,7 +364,7 @@ def _figures(st, summ, coef_s, pdp, ice, hs, modality, lc, top, ic):
         P.grid(ax, "x")
         st.figure(f"permutation_importance_{arm.replace('+', '_')}", fig, t,
                   f"Permutation importance of the {arm} best-member procedure, top 15 items; correlated genes share their group's value")
-    c = coef_s[coef_s.arm == "C"].head(20).iloc[::-1] if not coef_s.empty else pd.DataFrame()
+    c = coef_s[(coef_s.arm == "C") & (coef_s.procedure == "C|logreg_en")].head(20).iloc[::-1] if not coef_s.empty else pd.DataFrame()
     if len(c):
         fig, ax = P.fig(6.5, 0.3 * len(c) + 1.3)
         y = np.arange(len(c))
@@ -346,10 +391,13 @@ def _figures(st, summ, coef_s, pdp, ice, hs, modality, lc, top, ic):
             if d.empty:
                 ax.axis("off")
                 continue
-            numeric = bool(pd.to_numeric(d.value, errors="coerce").notna().all()) and d.value.nunique() > 2
-            key = "pos" if numeric else "value"           # numeric grids differ by split: align by quantile position
+            numeric = bool((d["kind"] == "numeric").all())
+            d = d.assign(value_s=d.value.astype(str))
+            key = "pos" if numeric else "value_s"         # numeric grids differ by split: align by quantile position
             m = d.groupby(key, sort=True).agg(x=("value", lambda v: pd.to_numeric(v, errors="coerce").mean() if numeric else v.iloc[0]),
                                               mean=("mean_pred", "mean"), min=("mean_pred", "min"), max=("mean_pred", "max"))
+            if not numeric:                                # categories: in natural order, as points with ranges
+                m = m.sort_index(key=lambda s: [(0, float(v)) if str(v).replace(".", "", 1).isdigit() else (1, str(v)) for v in s])
             xs = m.x.astype(float).to_numpy() if numeric else np.arange(len(m))
             if len(ice):
                 ii = ice[(ice.arm == arm) & (ice.feature == f)]
@@ -357,10 +405,15 @@ def _figures(st, summ, coef_s, pdp, ice, hs, modality, lc, top, ic):
                     if numeric:
                         ax.plot(pd.to_numeric(g.value), g.pred, color=P.NEUTRAL, alpha=0.35, linewidth=0.6)
                     else:
-                        pos = [list(m.index).index(v) for v in g.value if v in list(m.index)]
-                        ax.scatter(pos, g.pred[g.value.isin(m.index)], color=P.NEUTRAL, alpha=0.35, s=4)
-            ax.fill_between(xs, m["min"], m["max"], color=P.CAT[0], alpha=0.2, linewidth=0)
-            ax.plot(xs, m["mean"], color=P.CAT[0], marker="o", markersize=3)
+                        gs = g.assign(value_s=g.value.astype(str))
+                        gs = gs[gs.value_s.isin(m.index)]
+                        ax.scatter([list(m.index).index(v) for v in gs.value_s], gs.pred, color=P.NEUTRAL, alpha=0.35, s=4)
+            if numeric:
+                ax.fill_between(xs, m["min"], m["max"], color=P.CAT[0], alpha=0.2, linewidth=0)
+                ax.plot(xs, m["mean"], color=P.CAT[0], marker="o", markersize=3)
+            else:                                          # no line between unordered categories
+                ax.vlines(xs, m["min"], m["max"], color=P.CAT[0], linewidth=2, alpha=0.5)
+                ax.plot(xs, m["mean"], "o", color=P.CAT[0], markersize=5)
             if not numeric:
                 ax.set_xticks(list(xs))
                 ax.set_xticklabels([str(v) for v in m.x], rotation=45, ha="right", fontsize=6)
@@ -436,7 +489,7 @@ def _facts(summ, coef_s, shap_s, hs, modality, lc, top, farm_id, n_tasks, secs, 
         F[f"{arm}_lc"] = {float(k): round(v, 4) for k, v in l.items()}
     mod = modality.groupby(["arm", "procedure", "group"]).importance.mean()
     F["modality_best"] = {f"{a}|{g}": round(v, 4) for (a, p, g), v in mod.items() if p.endswith("|best")}
-    c = coef_s[coef_s.arm == "C"].head(5) if not coef_s.empty else pd.DataFrame()
+    c = coef_s[(coef_s.arm == "C") & (coef_s.procedure == "C|logreg_en")].head(5) if not coef_s.empty else pd.DataFrame()
     F["C_lr_top"] = [{"feature": f, "or": round(o, 3), "sign": round(sc, 2)} for f, o, sc in zip(c.feature, c.odds_ratio, c.sign_consistency)]
     if len(shap_s):
         agree = []

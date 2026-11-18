@@ -10,15 +10,16 @@ pip install -r requirements.txt     # exact pins; torch from the PyTorch CPU whe
 ```
 Use the activated env. Do not mix in conda's numpy/MKL packages: that brings a second OpenMP runtime and torch fails to import (FINDINGS F-014, F-027).
 
-## Build steps done so far (1, 1a, 1b, 2, 3)
+## Build steps done so far (1, 1a, 1b, 2, 3, 4)
 ```
 python run.py crosswalk             # 1a: writes reference/crosswalk/*.csv + a run with the coverage check
 python run.py holdout               # ONCE ONLY: frozen 20% holdout -> outputs/frozen/holdout.csv, hash into config.yaml
 python run.py splits                # ONCE ONLY: frozen nested CV splits on the training rows -> outputs/frozen/cv_splits.csv
 python run.py eda --mode both       # 1b: descriptive (all patients) + modelling (training rows, holdout + fold balance) EDA
 python run.py harness               # 2: floors through the nested CV (about 45 s)
-python run.py farm                  # 3: 178 configurations (7 members) + permutation test (about 1 h with farm.n_jobs = auto on 8 cores)
-python -m pytest -q                 # 61 tests (about 3 min; synthetic harness and neural tests, EDA rerun, small end-to-end farm)
+python run.py farm                  # 3: 826 configurations, 8 arms + permutation test (about 3.5 h with farm.n_jobs = auto on 8 cores)
+python run.py importance            # 4: explains the newest farm run's winners (about 2.5 h; --reuse RUN_ID rebuilds summaries in 15 min)
+python -m pytest -q                 # 80 tests (about 9 min; includes small end-to-end farm and importance runs)
 ```
 - `holdout` and `splits` refuse to run if their file exists. Every later stage verifies both files against the hashes in `config.yaml`.
 - Harness outputs: `outputs/<run>/harness/tables/harness_summary.md` (generated summary), `summary.csv`, `paired_comparisons.csv`,

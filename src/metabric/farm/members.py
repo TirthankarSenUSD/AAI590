@@ -13,10 +13,11 @@ from sklearn.svm import SVC
 from ..harness import Candidate
 from .preprocess import column_groups, preprocessor
 
-FAMILY = {"logreg_en": 1, "svm_rbf": 2, "random_forest": 3, "xgboost": 3,       # simpler first
-          "mlp": 4, "mlp_embed": 4, "multimodal": 5}
-KIND = {"logreg_en": "linear", "svm_rbf": "linear", "random_forest": "tree", "xgboost": "tree",
-        "mlp": "linear", "mlp_embed": "embed", "multimodal": "linear"}
+FAMILY = {"logreg_en": 1, "logreg_cause": 1.5, "svm_rbf": 2, "random_forest": 3, "xgboost": 3,   # simpler first
+          "xgboost_cause": 3.5, "mlp": 4, "mlp_embed": 4, "multimodal": 5}
+KIND = {"logreg_en": "linear", "logreg_cause": "linear", "svm_rbf": "linear", "random_forest": "tree",
+        "xgboost": "tree", "xgboost_cause": "tree", "mlp": "linear", "mlp_embed": "embed", "multimodal": "linear"}
+CAUSE = {"logreg_cause": "logreg_en", "xgboost_cause": "xgboost"}   # cause-specific member -> its binary counterpart
 NEURAL = {"mlp", "mlp_embed", "multimodal"}
 
 
@@ -43,7 +44,7 @@ def _estimator(member: str, p: dict, seed: int, groups: dict | None = None, nn: 
         if member == "mlp_embed":
             return TorchEmbedMLP(n_cat=len(groups["categorical"]), hidden=tuple(p["hidden"]), **common)
         return TorchMultimodal(n_rna=len(groups["rna"]), block_dropout=p["block_dropout"], **common)
-    if member == "logreg_en":
+    if member in ("logreg_en", "logreg_cause"):          # 3 classes -> multinomial (cause-specific)
         return LogisticRegression(C=p["C"], l1_ratio=p["l1_ratio"], solver="saga", max_iter=3000, tol=1e-3,
                                   random_state=seed)
     if member == "svm_rbf":
@@ -51,7 +52,7 @@ def _estimator(member: str, p: dict, seed: int, groups: dict | None = None, nn: 
     if member == "random_forest":
         return RandomForestClassifier(n_estimators=p["n_estimators"], max_features=p["max_features"],
                                       min_samples_leaf=p["min_samples_leaf"], n_jobs=1, random_state=seed)
-    if member == "xgboost":
+    if member in ("xgboost", "xgboost_cause"):            # 3 classes -> multi:softprob (cause-specific)
         from xgboost import XGBClassifier
         return XGBClassifier(n_estimators=p["n_estimators"], learning_rate=p["learning_rate"], max_depth=p["max_depth"],
                              subsample=p["subsample"], colsample_bytree=p["colsample_bytree"],
@@ -62,6 +63,7 @@ def _estimator(member: str, p: dict, seed: int, groups: dict | None = None, nn: 
 
 def _hyper_complexity(member: str, p: dict, grid: dict) -> float:
     """Within a member, stronger regularisation counts as simpler (value in [0, 1))."""
+    member = CAUSE.get(member, member)
     idx = lambda k: grid[k].index(p[k]) / max(len(grid[k]), 1)  # noqa: E731
     if member == "logreg_en":
         return 0.5 * idx("C") + 0.1 * (1 - p["l1_ratio"])
@@ -114,6 +116,8 @@ def _arm_reps(fc: dict, arm: str, groups: dict, member: str) -> list[tuple[str, 
             names = ["all"]                                 # one encoder over the full RNA block
         elif member in NEURAL:
             names = [n for n in fc["neural_rna_representations"] if n in names]
+        elif member in CAUSE:
+            names = [n for n in fc["cause_rna_representations"] if n in names]
         if member not in fc["ae_members"]:
             names = [n for n in names if "dae" not in fc["rna_representations"][n]]
         rna = [(n, fc["rna_representations"][n]) for n in names]
@@ -138,6 +142,8 @@ def build_candidates(cfg, members=None, arms=None) -> tuple[list[Candidate], dic
         for member in members:
             if member in NEURAL and not fc["arms"][arm].get("neural", True):
                 continue                                   # neural members deferred on this arm
+            if member in CAUSE and arm not in fc["cause_arms"]:
+                continue                                   # cause-specific members only where configured
             if member == "multimodal" and (n_blocks < 2 or groups["dna"] or not groups["rna"]):
                 continue                                   # clinical + RNA encoders only (for now)
             grid = fc["grids"][member]
@@ -151,11 +157,16 @@ def build_candidates(cfg, members=None, arms=None) -> tuple[list[Candidate], dic
                     name = f"{arm}|{member}|{rep_name}|{pstr}"
 
                     def make(member=member, p=p, rr=rna_rep, dr=dna_rep, groups=groups, scale=scale):
-                        return make_pipeline(preprocessor(groups, KIND[member], rr, cfg, seed, scale, dr),
+                        pipe = make_pipeline(preprocessor(groups, KIND[member], rr, cfg, seed, scale, dr),
                                              _estimator(member, p, seed, groups, fc.get("neural")))
+                        if member in CAUSE:
+                            from .cause import CauseSpecific
+                            return CauseSpecific(pipe)
+                        return pipe
 
                     complexity = (FAMILY[member] * 1000 + _n_inputs(rna_rep, dna_rep, groups, cfg)
                                   + _hyper_complexity(member, p, grid))
-                    cands.append(Candidate(name, make, cols, complexity, True, f"{member} on {arm} ({rep_name}; {pstr})"))
+                    cands.append(Candidate(name, make, cols, complexity, True, f"{member} on {arm} ({rep_name}; {pstr})",
+                                           target="cause" if member in CAUSE else "binary"))
                     meta[name] = Meta(name, arm, member, rep_name, tuple(p.items()))
     return cands, meta

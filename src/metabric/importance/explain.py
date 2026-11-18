@@ -119,10 +119,18 @@ def shap_by_source(pipe, member: str, X_train: pd.DataFrame, X_test: pd.DataFram
 
 
 def lr_coefficients(pipe, fm: pd.DataFrame) -> pd.DataFrame:
+    """Binary model: one contrast (death vs alive). Cause-specific (multinomial) model: two contrasts,
+    cancer death vs alive and other-cause death vs alive (coefficient differences against alive)."""
     est = pipe[-1]
-    c = est.coef_[0]
-    return pd.DataFrame({"feature": fm.feature, "source": fm.source, "block": fm.block, "coef": c,
-                         "odds_ratio": np.exp(c)})
+    W = np.atleast_2d(est.coef_)
+    if W.shape[0] == 1:
+        parts = [("death vs alive", W[0])]
+    else:
+        cls = list(est.classes_)
+        a = W[cls.index(0)]
+        parts = [("cancer death vs alive", W[cls.index(1)] - a), ("other-cause death vs alive", W[cls.index(2)] - a)]
+    return pd.concat([pd.DataFrame({"contrast": k, "feature": fm.feature, "source": fm.source, "block": fm.block,
+                                    "coef": c, "odds_ratio": np.exp(c)}) for k, c in parts], ignore_index=True)
 
 
 def gene_groups(X_train_rna: pd.DataFrame, distance_cut: float, min_size: int) -> list[list[str]]:
@@ -163,11 +171,13 @@ def permutation_importance(pipe, X_test: pd.DataFrame, y_test, groups: dict[str,
     return pd.DataFrame(rows).assign(base_auroc=base)
 
 
-def _grid(x_train: pd.Series, n: int) -> list:
-    if pd.api.types.is_numeric_dtype(x_train) and x_train.nunique() > 8:
-        return list(np.unique(np.nanquantile(x_train.astype(float), np.linspace(0.05, 0.95, n))))
+def _grid(x_train: pd.Series, n: int) -> tuple[list, str]:
+    """Evaluation points from the training rows: quantiles for numeric columns ("numeric"), the
+    observed levels (up to 12, most frequent first) for categorical or low-cardinality ones ("level")."""
+    if pd.api.types.is_numeric_dtype(x_train) and not isinstance(x_train.dtype, pd.CategoricalDtype) and x_train.nunique() > 8:
+        return list(np.unique(np.nanquantile(x_train.astype(float), np.linspace(0.05, 0.95, n)))), "numeric"
     vals = x_train.dropna().value_counts()
-    return list(vals.index[:8])
+    return list(vals.index[:12]), "level"
 
 
 def _set(X: pd.DataFrame, col: str, v) -> pd.DataFrame:
@@ -182,22 +192,27 @@ def _set(X: pd.DataFrame, col: str, v) -> pd.DataFrame:
 
 def partial_dependence(pipe, X_train: pd.DataFrame, X_test: pd.DataFrame, col: str, n: int) -> pd.DataFrame:
     """Mean predicted risk on the test rows with `col` set to each grid value (grid from training rows)."""
-    return pd.DataFrame([{"pos": i, "value": v, "mean_pred": float(pipe.predict_proba(_set(X_test, col, v))[:, 1].mean())}
-                         for i, v in enumerate(_grid(X_train[col], n))])
+    grid, kind = _grid(X_train[col], n)
+    return pd.DataFrame([{"pos": i, "value": v, "kind": kind,
+                          "mean_pred": float(pipe.predict_proba(_set(X_test, col, v))[:, 1].mean())}
+                         for i, v in enumerate(grid)])
 
 
 def ice(pipe, X_train: pd.DataFrame, X_rows: pd.DataFrame, col: str, n: int) -> pd.DataFrame:
     rows = []
-    for i, v in enumerate(_grid(X_train[col], n)):
+    grid, kind = _grid(X_train[col], n)
+    for i, v in enumerate(grid):
         p = pipe.predict_proba(_set(X_rows, col, v))[:, 1]
-        rows += [{"patient_id": pid, "pos": i, "value": v, "pred": float(pi)} for pid, pi in zip(X_rows.index, p)]
+        rows += [{"patient_id": pid, "pos": i, "value": v, "kind": kind, "pred": float(pi)} for pid, pi in zip(X_rows.index, p)]
     return pd.DataFrame(rows)
 
 
 def h_statistic(pipe, X_rows: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
-    """Friedman's pairwise H^2 on the given rows: share of the joint partial dependence of (j, k) not
-    explained by their separate partial dependences (0 = no interaction). Model-agnostic."""
+    """Friedman's pairwise H^2 on the given rows, on the log-odds scale (Friedman & Popescu 2008):
+    share of the joint partial dependence of (j, k) not explained by their separate partial
+    dependences (0 = no interaction). Model-agnostic; a logistic regression gives ~0 by construction."""
     m = len(X_rows)
+    cols = list(dict.fromkeys(cols))
 
     def pd_at(fix: list[str]) -> np.ndarray:
         out = np.empty(m)
@@ -205,7 +220,8 @@ def h_statistic(pipe, X_rows: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
             Xi = X_rows.copy()
             for c in fix:
                 Xi = _set(Xi, c, X_rows[c].iloc[i])
-            out[i] = pipe.predict_proba(Xi)[:, 1].mean()
+            p = np.clip(pipe.predict_proba(Xi)[:, 1], 1e-6, 1 - 1e-6)
+            out[i] = np.log(p / (1 - p)).mean()
         return out - out.mean()
 
     single = {c: pd_at([c]) for c in cols}
