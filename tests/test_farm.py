@@ -22,7 +22,9 @@ def test_parallel_equals_serial():
     pd.testing.assert_frame_equal(a.folds, b.folds)
     pd.testing.assert_frame_equal(a.preds, b.preds)
     pd.testing.assert_frame_equal(a.selection, b.selection)
-    c = H.evaluate(cands, select=True, n_jobs=2, groups=[[2, 0], [1]])        # grouped: same result, same order
+    lines = []
+    c = H.evaluate(cands, select=True, n_jobs=2, groups=[[2, 0], [1]], log=lines.append)   # grouped: same result
+    assert lines and "2/2 tasks" in lines[-1]                                   # progress reported
     pd.testing.assert_frame_equal(a.folds, c.folds)
     pd.testing.assert_frame_equal(a.preds, c.preds)
 

@@ -15,6 +15,7 @@ A reproducible machine-learning pipeline that predicts overall survival in breas
 | 2 | Evaluation harness (nested cross-validation, baselines) | done |
 | 3a | Model farm: classical members (logistic regression, SVM, random forest, XGBoost) | done |
 | 3b | Model farm: neural members (MLP, MLP with embeddings, multimodal) | done |
+| 3c | Model farm: all eight data arms, RNA and DNA representations | done |
 | 4 | Gates and importance | next |
 | 5–7 | Ensemble, model-agreement analysis, report | planned |
 

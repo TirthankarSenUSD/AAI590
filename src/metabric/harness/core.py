@@ -137,11 +137,31 @@ def _score_candidate(c: Candidate, X: pd.DataFrame, y: pd.Series, splits: list[S
     return recs, preds
 
 
-def _score_group(cands: list[Candidate], X: pd.DataFrame, y: pd.Series, kw: dict):
-    """Several candidates in one worker, in order (unit of parallel work when grouped)."""
-    cols = list(dict.fromkeys(c for cand in cands for c in cand.columns))
-    Xg = X[cols]
-    return [_score_candidate(c, Xg[c.columns], y, **kw) for c in cands]
+def _score_group(k: int, cands: list[Candidate], Xg: pd.DataFrame, y: pd.Series, kw: dict):
+    """Several candidates in one worker, in order (the unit of parallel work). `Xg` holds only the
+    columns these candidates use, so each task ships no more data than it needs."""
+    return k, [_score_candidate(c, Xg[c.columns], y, **kw) for c in cands]
+
+
+class _Progress:
+    """Progress lines for long evaluations: every 5% of tasks or every 2 minutes, with an ETA."""
+
+    def __init__(self, n: int, log, label: str):
+        import time
+        self.n, self.log, self.label, self.done = n, log, label, 0
+        self.t0 = self.last = time.time()
+        self.step = max(1, n // 20)
+
+    def tick(self):
+        import time
+        self.done += 1
+        now = time.time()
+        if self.log and (self.done % self.step == 0 or now - self.last >= 120 or self.done == self.n):
+            el = now - self.t0
+            eta = el / self.done * (self.n - self.done)
+            self.log(f"{self.label}: {self.done}/{self.n} tasks ({100 * self.done / self.n:.0f}%), "
+                     f"elapsed {el / 60:.1f} min, ETA {eta / 60:.1f} min")
+            self.last = now
 
 
 _ID_COLS = ("candidate", "split_id", "repeat", "outer_fold", "complexity", "eligible")
@@ -193,7 +213,8 @@ class Harness:
         return _proba(est, cand, self.X, rows)
 
     def evaluate(self, candidates: list[Candidate], y: pd.Series | None = None, select: bool = False,
-                 light: bool = False, n_jobs: int = 1, groups: list[list[int]] | None = None) -> Result:
+                 light: bool = False, n_jobs: int = 1, groups: list[list[int]] | None = None,
+                 log=None, label: str = "scoring") -> Result:
         """Score every candidate on every frozen split. `light` skips the inner layer (used by the
         permutation test when no selection is needed). `select` also scores the select-the-best
         procedure, choosing inside each outer training fold by the fixed rule.
@@ -207,14 +228,27 @@ class Harness:
         # unsupervised representation). Results are always assembled in candidate order.
         groups = groups or [[i] for i in range(len(candidates))]
         assert sorted(i for g in groups for i in g) == list(range(len(candidates))), "groups must partition candidates"
+        def task(k, g):
+            cands = [candidates[i] for i in g]
+            cols = list(dict.fromkeys(c for cand in cands for c in cand.columns))
+            return k, cands, self.X[cols]
+
+        prog = _Progress(len(groups), log, label)
+        gouts = {}
         if n_jobs == 1 or len(groups) == 1:
-            gouts = [_score_group([candidates[i] for i in g], self.X, y, kw) for g in groups]
+            for k, g in enumerate(groups):
+                _, out = _score_group(*task(k, g), y, kw)
+                gouts[k] = out
+                prog.tick()
         else:
             from joblib import Parallel, delayed, parallel_config
             with parallel_config(backend="loky", inner_max_num_threads=1):
-                gouts = Parallel(n_jobs=n_jobs)(delayed(_score_group)([candidates[i] for i in g], self.X, y, kw)
-                                                for g in groups)
-        by_idx = {i: o for g, go in zip(groups, gouts) for i, o in zip(g, go)}
+                it = Parallel(n_jobs=n_jobs, return_as="generator_unordered")(
+                    delayed(_score_group)(*task(k, g), y, kw) for k, g in enumerate(groups))
+                for k, out in it:                       # completion order; reassembled below
+                    gouts[k] = out
+                    prog.tick()
+        by_idx = {i: o for k, g in enumerate(groups) for i, o in zip(g, gouts[k])}
         outs = [by_idx[i] for i in range(len(candidates))]
         folds = pd.DataFrame([r for recs, _ in outs for r in recs])
         preds = pd.concat([p for _, ps in outs for p in ps], ignore_index=True)

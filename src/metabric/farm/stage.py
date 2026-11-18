@@ -63,7 +63,7 @@ def run_farm(cfg: Config, run: Run, members=None, arms=None) -> dict:
                 {a: sum(m.arm == a for m in meta.values()) for a in arms}, len(floors), len(H.splits), n_jobs)
     t0 = time.time()
     allc = cands + floors
-    res = H.evaluate(allc, n_jobs=n_jobs, groups=_worker_groups(allc, meta))
+    res = H.evaluate(allc, n_jobs=n_jobs, groups=_worker_groups(allc, meta), log=st.log.info, label="scoring")
     st.log.info("all configurations scored in %.0f s", time.time() - t0)
     folds = res.folds
     folds["arm"] = folds.candidate.map(lambda n: meta[n].arm if n in meta else "floor")
@@ -164,8 +164,11 @@ def run_farm(cfg: Config, run: Run, members=None, arms=None) -> dict:
     perm_arm = perm_arm if perm_arm in arms else arms[0]
     perm_names = procs[f"{perm_arm}|best"]
     perm_cands = [c for c in cands if c.name in set(perm_names)]
+    shuffle = [0]
     def proc_fn(y):
-        r = H.evaluate(perm_cands, y=y, select=True, light=True, n_jobs=n_jobs)
+        label = "permutation: observed labels" if shuffle[0] == 0 else f"permutation: shuffle {shuffle[0]}"
+        shuffle[0] += 1
+        r = H.evaluate(perm_cands, y=y, select=True, light=True, n_jobs=n_jobs, log=st.log.info, label=label)
         return float(r.selection.outer_auroc.mean())
     t1 = time.time()
     perm, perm_s = H.permutation_test(proc_fn, cfg["farm"].get("n_permutations", cfg["harness"]["n_permutations"]), rng)
