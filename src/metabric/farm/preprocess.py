@@ -142,8 +142,8 @@ def dna_transformer(rep: dict, kind: str, cfg):
     if "count" in rep:
         return make_pipeline(MutationCount(), StandardScaler()) if kind == "linear" else MutationCount()
     if "pathway" in rep:
-        sets, _ = gene_set_positions(cfg, rep["pathway"], "dna", rep["min_dna"])
-        return PathwayFlags(sets)
+        sets, names = gene_set_positions(cfg, rep["pathway"], "dna", rep["min_dna"])
+        return PathwayFlags(sets, names)
     if "embed" in rep:
         e = CooccurrenceEmbedding(rep["embed"], cfg.seed)
         return make_pipeline(e, StandardScaler()) if kind == "linear" else e

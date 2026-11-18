@@ -185,8 +185,8 @@ class MutationCount(BaseEstimator, TransformerMixin):
 class PathwayFlags(BaseEstimator, TransformerMixin):
     """One 0/1 flag per gene set: any of the set's genes mutated."""
 
-    def __init__(self, sets=None):
-        self.sets = sets
+    def __init__(self, sets=None, names=None):
+        self.sets, self.names = sets, names
 
     def fit(self, X, y=None):
         return self

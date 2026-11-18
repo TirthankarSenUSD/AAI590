@@ -115,6 +115,21 @@ farm:
     val_fraction: 0.15
     n_seeds: 2                      # predictions averaged over seeds
 
+# Gates and importance (step 4). Explains the winners a farm run chose inside each outer fold: each is refitted
+# on its outer training rows (identical to the farm fit) and explained on the outer test rows only.
+importance:
+  arms_full: [C, C+RNA, strict_clinical]      # every member procedure + the best-member procedure (owner, F-050)
+  arms_modality_only: [C+RNA+DNA]             # grouped (modality) permutation importance only
+  shap_members: [logreg_en, random_forest, xgboost]   # exact SHAP only (linear, TreeSHAP); others permutation only (F-049)
+  n_repeats: 5                      # permutation repeats per feature group
+  gene_groups: {distance_cut: 0.5, min_size: 2}       # correlated genes permuted together (modules on outer-train rows)
+  top_n: 10                         # features for partial dependence, ICE and interactions (owner-accepted proposal)
+  interaction_method: friedman_h    # pairwise H-statistic, model-agnostic (owner-accepted recommendation)
+  pdp_grid: 10                      # quantile grid points for numeric features
+  ice_rows: 50                      # patients drawn for ICE curves (split r0o0)
+  h_rows: 60                        # held-out patients per split for the H-statistic
+  learning_curve_fractions: [0.25, 0.5, 0.75, 1.0]
+
 # Floors: always reported, never eligible to win (CLAUDE.md section 5). Built in step 2.
 floors:
   majority: {}

@@ -128,6 +128,19 @@ def cmd_farm(args) -> str:
     return run.run_id
 
 
+def cmd_importance(args) -> str:
+    from .importance.stage import run_importance
+    cfg = load_config()
+    run = Run(cfg, "importance" + (f" --farm-run {args.farm_run}" if args.farm_run else ""))
+    try:
+        run_importance(cfg, run, args.farm_run)
+        run.finalize()
+    except BaseException as exc:
+        run.fail(exc)
+        raise
+    return run.run_id
+
+
 def cmd_eda(args) -> str:
     from .eda import run_eda
     cfg = load_config()
@@ -153,11 +166,13 @@ def main(argv=None) -> int:
     f = sub.add_parser("farm", help="run the model farm through the harness (members and arms from config)")
     f.add_argument("--members", type=lambda s: s.split(","), default=None, help="comma-separated subset of farm.members")
     f.add_argument("--arms", type=lambda s: s.split(","), default=None, help="comma-separated subset of farm.arms")
+    imp = sub.add_parser("importance", help="gates and feature importance of a completed farm run's winners")
+    imp.add_argument("--farm-run", default=None, help="farm run id (default: the newest completed farm run)")
     e = sub.add_parser("eda", help="rerunnable EDA stage")
     e.add_argument("--mode", choices=["descriptive", "modelling", "both"], default="both")
     args = p.parse_args(argv)
     rid = {"crosswalk": cmd_crosswalk, "holdout": cmd_holdout, "splits": cmd_splits, "harness": cmd_harness,
-           "farm": cmd_farm, "eda": cmd_eda}[args.cmd](args)
+           "farm": cmd_farm, "importance": cmd_importance, "eda": cmd_eda}[args.cmd](args)
     print(f"run complete: outputs/{rid}")
     return 0
 
