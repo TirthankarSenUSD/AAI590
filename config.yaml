@@ -169,6 +169,20 @@ agreement:
     - [C+RNA+DNA|best, C|best]
     - [strict_clinical|best, C|best]
 
+# Validation report and patient output (step 7). The final model is refitted once on all training rows.
+report:
+  deploy_folds: 3                   # folds that play the inner folds' role in the deployment fit
+  n_boot: 50                        # bootstrap refits for the patient probability interval (low budget; raise later)
+  n_background: 100                 # training patients used as the Shapley background
+  n_permutations: 20                # Shapley permutations per patient (antithetic pairs)
+  top_k: 5                          # contributing factors listed per data type
+  context_column: "pam50_+_claudin-low_subtype"   # cohort-context group (owner, 2026-11-19: PAM50 subtype only)
+  small_group: 30                   # groups with fewer training patients are flagged as small
+  risk_quantiles: [0.25, 0.5, 0.75] # risk-group cutpoints: quantiles of the training out-of-fold risk
+  risk_labels: [low, below average, above average, high]
+  cause_member: logreg_cause        # cause-specific member for the cause breakdown
+  example_quantiles: [0.05, 0.25, 0.5, 0.75, 0.95]   # example records: patients at these quantiles of risk
+
 # Floors: always reported, never eligible to win (CLAUDE.md section 5). Built in step 2.
 floors:
   majority: {}

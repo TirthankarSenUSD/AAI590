@@ -59,8 +59,16 @@ class FrequencySelector(BaseEstimator, TransformerMixin):
         return np.asarray(X, dtype=float)[:, self.selected_]
 
 
+def _times(Z, factor):          # module-level (not a lambda) so fitted pipelines can be saved
+    return Z * factor
+
+
+def _plus_one(Z):
+    return Z + 1
+
+
 def _scale(factor: float):
-    return FunctionTransformer(lambda Z: Z * factor, feature_names_out="one-to-one")
+    return FunctionTransformer(_times, kw_args={"factor": factor}, feature_names_out="one-to-one")
 
 
 def column_groups(cfg, arm: str) -> dict[str, list[str]]:
@@ -181,7 +189,7 @@ def preprocessor(groups: dict, kind: str, rep: dict | None, cfg, seed: int, rna_
             parts.append(("cat", make_pipeline(CategoricalAsString(),
                                                OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1,
                                                               min_frequency=rare),
-                                               FunctionTransformer(lambda Z: Z + 1, feature_names_out="one-to-one")),
+                                               FunctionTransformer(_plus_one, feature_names_out="one-to-one")),
                           groups["categorical"]))              # 0 = unseen level
         return ColumnTransformer(parts, remainder="drop", verbose_feature_names_out=False)
     else:

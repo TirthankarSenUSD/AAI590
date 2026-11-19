@@ -19,7 +19,11 @@ python run.py eda --mode both       # 1b: descriptive (all patients) + modelling
 python run.py harness               # 2: floors through the nested CV (about 45 s)
 python run.py farm                  # 3: 826 configurations, 8 arms + permutation test (about 3.5 h with farm.n_jobs = auto on 8 cores)
 python run.py importance            # 4: explains the newest farm run's winners (about 2.5 h; --reuse RUN_ID rebuilds summaries in 15 min)
-python -m pytest -q                 # 80 tests (about 9 min; includes small end-to-end farm and importance runs)
+python run.py ensemble --farm-runs FARM_3C,FARM_CAUSE                     # 5: ensembles and the final model
+python run.py agreement --farm-runs FARM_3C,FARM_CAUSE --importance-run IMP # 6: model agreement and the omics ablation
+python run.py report --farm-runs FARM_3C,FARM_CAUSE --ensemble-run ENS --agreement-run AGR
+                                    # 7: validation report, final-model fit (models/final_model.joblib), patient output
+python -m pytest -q                 # 97 tests (about 15 min; includes small end-to-end farm, importance and ensemble runs)
 ```
 - `holdout` and `splits` refuse to run if their file exists. Every later stage verifies both files against the hashes in `config.yaml`.
 - Harness outputs: `outputs/<run>/harness/tables/harness_summary.md` (generated summary), `summary.csv`, `paired_comparisons.csv`,

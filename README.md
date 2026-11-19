@@ -37,7 +37,7 @@ Each stage lives in its own folder under `src/metabric/`, with a `README.md` tha
 | 4 | Importance | Gates, SHAP and permutation importance, partial dependence, interactions | `importance` | built | [importance/README.md](src/metabric/importance/README.md) |
 | 5 | Ensemble | Fused arm, agreement merge, stacker, final model and regression floor | `ensemble` | built | [ensemble/README.md](src/metabric/ensemble/README.md) |
 | 6 | Agreement | Model-agreement analysis, disagreement flag, cause breakdown, omics ablation | `agreement` | built | [agreement/README.md](src/metabric/agreement/README.md) |
-| 7 | Report | Generated validation report and patient-level output | – | planned | [report/README.md](src/metabric/report/README.md) |
+| 7 | Report | Generated validation report, final-model deployment fit, patient-level output | `report` | built | [report/README.md](src/metabric/report/README.md) |
 | P2 | Phase 2 | Survival analysis on the same splits | – | planned | [phase2/README.md](src/metabric/phase2/README.md) |
 
 ## Design principles
@@ -64,7 +64,10 @@ Each stage lives in its own folder under `src/metabric/`, with a `README.md` tha
 │   ├── harness/            evaluation harness and floors
 │   ├── farm/              model farm (seven members)
 │   ├── importance/        gates and feature importance
-│   └── ensemble/ agreement/ report/ phase2/   (planned)
+│   ├── ensemble/          fusion, ensemble and final model
+│   ├── agreement/         model agreement and the omics ablation
+│   ├── report/            validation report and patient output
+│   └── phase2/            survival analysis (planned)
 ├── tests/                  test suite (pytest)
 ├── data/                   METABRIC_RNA_Mutation.csv (read-only)
 ├── reference/              gene-set files; crosswalk/ is built from them

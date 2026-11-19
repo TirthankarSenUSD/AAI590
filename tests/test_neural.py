@@ -71,3 +71,19 @@ def test_neural_candidates_built_per_arm(cfg):
     assert set(m[m.member == "multimodal"].arm) == {"C+RNA"}               # needs two blocks
     assert set(m[(m.arm == "C+RNA") & (m.member == "mlp")].rep) == set(cfg["farm"]["neural_rna_representations"])
     assert set(m[m.arm == "C"].rep) == {"none"}
+
+
+def test_fitted_networks_survive_pickling():
+    """Fitted networks are saved as weights and rebuilt on load, giving identical predictions."""
+    import pickle
+
+    from metabric.farm.neural import TorchEmbedMLP, TorchMLP, TorchMultimodal
+    rng = np.random.default_rng(0)
+    X = rng.normal(size=(120, 6)).astype(np.float32)
+    X[:, -1] = rng.integers(1, 4, 120)
+    y = (X[:, 0] + rng.normal(size=120) > 0).astype(int)
+    for m in (TorchMLP(hidden=(8,), max_epochs=5, n_seeds=1), TorchEmbedMLP(n_cat=1, hidden=(8,), max_epochs=5, n_seeds=1),
+              TorchMultimodal(n_rna=3, clin_dim=4, rna_dim=4, max_epochs=5, n_seeds=1)):
+        m.fit(X, y)
+        m2 = pickle.loads(pickle.dumps(m))
+        assert np.allclose(m.predict_proba(X), m2.predict_proba(X))

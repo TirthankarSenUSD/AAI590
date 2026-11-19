@@ -169,6 +169,20 @@ def cmd_agreement(args) -> str:
     return run.run_id
 
 
+def cmd_report(args) -> str:
+    from .report.stage import run_report
+    cfg = load_config()
+    run = Run(cfg, f"report --farm-runs {','.join(args.farm_runs)} --ensemble-run {args.ensemble_run} "
+                   f"--agreement-run {args.agreement_run}")
+    try:
+        run_report(cfg, run, args.farm_runs, args.ensemble_run, args.agreement_run)
+        run.finalize()
+    except BaseException as exc:
+        run.fail(exc)
+        raise
+    return run.run_id
+
+
 def cmd_eda(args) -> str:
     from .eda import run_eda
     cfg = load_config()
@@ -206,11 +220,16 @@ def main(argv=None) -> int:
     ag.add_argument("--farm-runs", type=lambda s: s.split(","), required=True,
                     help="farm runs with per-patient predictions; for each procedure the first run listed wins")
     ag.add_argument("--importance-run", required=True, help="importance run with permutation importance")
+    rp = sub.add_parser("report", help="validation report, final-model deployment fit and patient output (step 7)")
+    rp.add_argument("--farm-runs", type=lambda s: s.split(","), required=True,
+                    help="farm runs; the first holding the final arm's procedure supplies its metrics")
+    rp.add_argument("--ensemble-run", required=True, help="ensemble run that chose the final model")
+    rp.add_argument("--agreement-run", required=True, help="agreement run (ablation, disagreement, cause breakdown)")
     e = sub.add_parser("eda", help="rerunnable EDA stage")
     e.add_argument("--mode", choices=["descriptive", "modelling", "both"], default="both")
     args = p.parse_args(argv)
     rid = {"crosswalk": cmd_crosswalk, "holdout": cmd_holdout, "splits": cmd_splits, "harness": cmd_harness,
-           "farm": cmd_farm, "importance": cmd_importance, "ensemble": cmd_ensemble, "agreement": cmd_agreement, "eda": cmd_eda}[args.cmd](args)
+           "farm": cmd_farm, "importance": cmd_importance, "ensemble": cmd_ensemble, "agreement": cmd_agreement, "report": cmd_report, "eda": cmd_eda}[args.cmd](args)
     print(f"run complete: outputs/{rid}")
     return 0
 

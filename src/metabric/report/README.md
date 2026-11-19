@@ -1,42 +1,74 @@
 # report: validation report and patient-level output
 
-**Status:** planned (build step 7); no code yet. Design: PLAN.md sections 6 (report), 10 and 11 (A3, A4).
+**Status:** built (build step 7). **Command:**
+```
+python run.py report --farm-runs A,B --ensemble-run E --agreement-run G
+```
 
-## Validation report
+The stage turns the nested-CV results into a generated validation report, refits the final model once on all training rows for use, and produces the patient-level output. It reads only training rows: the holdout is never touched here.
 
-Generated from the run artifacts; nothing is typed by hand. Statements are computed with conditional wording, and every comparison uses the same metric on both sides. It contains:
+## Inputs (all recorded in the manifest)
 
-- **The headline:** the outer-fold score of the select-and-ensemble procedure.
-- **Each member's own score** and how often each member won (winner stability).
-- **Optimism** (inner against outer).
-- **Calibration:** raw and recalibrated (reliability curve, Brier skill, slope, intercept).
-- **Treatment-subgroup metrics** with counts and intervals.
-- **The baselines** on the same splits.
-- **The holdout, scored once, last.** Nothing that depends on it is recorded before then.
-- **Limitations:**
-  - the any-death label;
-  - a single cohort source;
-  - treatment confounding;
-  - weak molecular signal;
-  - the file's NPI definition.
+- **Ensemble run:** `final_model.csv` (which arm and option won) and the paired arm comparisons.
+- **Farm runs:** the final arm's select-the-best procedure (`<arm>|best`): metrics, winners, paired comparisons with the floors, overfit gate, treatment subgroups, reliability, winner stability and the permutation test. Each member's own score comes from the first listed farm run that holds it.
+- **Agreement run:** ablation, the disagreement verdict and the per-patient cause-specific risks.
+- The config sections that decide how data are prepared (columns, seed, splits, holdout) must match every input run.
 
-Every figure links back to its run and manifest entry.
+## Steps
 
-## Patient-level output (a function, no user interface)
+1. **Validation report** (`validation_report.md`). Every sentence is computed from the inputs with conditional wording (`text.py`), and every comparison names one metric for both sides. It contains:
+   - the headline: the outer-fold score of the select-and-ensemble procedure;
+   - discrimination, calibration (raw and recalibrated) and error metrics next to the age-only floor;
+   - threshold metrics at operating points fixed on inner folds (recall, precision, F1, specificity, NPV);
+   - the overfit gate, the optimism and the permutation test;
+   - paired comparisons with the floors;
+   - each member's own score and winner stability;
+   - treatment-subgroup metrics;
+   - the omics answer (arm comparisons and ablation);
+   - agreement findings;
+   - the holdout status;
+   - limitations.
+2. **Deployment fit** (`deploy.py`). The final procedure is run once on all training rows, with `report.deploy_folds` stratified folds in the inner folds' role:
+   - every member picks its configuration by the inner rule;
+   - members whose predictions correlate above `ensemble.merge_spearman` are merged (logit average weighted by AUROC − 0.5);
+   - the `best_single` option keeps the best merged column (simplest within 1 SE).
 
-Returns one structured record per patient:
-- **Inputs:** echoed back, with how missing values were handled.
-- **Risk:** the calibrated probability of death with a bootstrap interval, its percentile among training patients, and the risk group (cutpoints from training data).
-- **Contributing factors:** SHAP-based, grouped by clinical, RNA and DNA, worded "associated with".
-- **Cohort context:** percentiles, mutation prevalence, and an expression-based group with its observed death rate, counts, intervals and a small-group flag.
-- **Model quality:** the model's cross-validated AUROC and calibration.
-- **Flags:** inputs outside the training range, and the disagreement flag if it proves useful.
+   **Primary probabilities** follow the overfit gate: if the out-of-fold calibration slope is above `harness.overfit_gate.recalibrate_above_slope`, a Platt map fitted on those predictions is applied.
 
-It never gives a diagnosis, treatment advice, causal claims, individual certainty or a time horizon (Phase 1).
+   **Bootstrap refits** (`report.n_boot`, configuration and weights fixed) give each patient's probability interval.
 
-## Tests
+   The fitted model and its explainer are saved to `models/final_model.joblib`.
+3. **Patient output** (`patient.py`, `PatientExplainer.records(X)` or `.record(dict)`). Each record holds:
+   - **Inputs:** echoed back, each with its status (provided, missing or not supplied) and how a gap is handled.
+   - **Risk:** the primary P(death) with a bootstrap 95% interval, its percentile among the training patients' out-of-fold predictions, the risk group (quartile cutpoints of those predictions) and that group's observed death rate (Wilson interval).
+   - **Cause breakdown:** P(cancer death) and P(other-cause death) from the cause-specific member (`report.cause_member`).
+   - **Contributions:** interventional Shapley values of the model's log-odds over the raw input columns, from antithetic permutations against a background of training patients, grouped by clinical / RNA / DNA and worded "associated with higher/lower estimated risk". Contributions plus the base value equal the model's log-odds exactly.
+   - **Cohort context:** the PAM50 subtype group (`report.context_column`) with its training count, deaths, observed death rate (Wilson interval) and a small-group flag (`report.small_group`); percentiles of the numeric inputs; prevalence of any mutations supplied.
+   - **Model quality:** the nested-CV AUROC with its interval, calibration slopes and Brier skill.
+   - **Flags:** numeric inputs outside the training range, and category levels never seen in training.
+   - **A fixed disclaimer:** the record gives no diagnosis, no treatment advice, no causal claim, no individual certainty and no time horizon.
 
-- Probabilities lie in [0, 1].
-- SHAP contributions plus the base value equal the model output.
-- A single-patient call gives the same output as a batch call.
-- Flipping a metric in a fake results folder changes the report's wording.
+   There is no "models disagree" flag: the agreement analysis found that disagreement does not predict error.
+
+## Outputs (`outputs/<run>/report/`, plus `outputs/<run>/models/`)
+
+| Kind | Outputs |
+|---|---|
+| Report | `validation_report.md` |
+| Deployment | `deploy_candidates`, `deploy_member_winners`, `deploy_merge`, `deploy_oof_predictions`; `models/final_model.joblib` |
+| Patients | `patient_output` (every training patient: out-of-fold risk from the deployment folds, percentile, risk group, subtype, out-of-fold cause-specific risks), `risk_groups`, `cohort_context`, `example_patient_records.json` (in-sample illustration of the record format), `contribution_check` |
+| Figures | reliability (final procedure vs age-only floor), treatment subgroups, observed death rate by risk group |
+
+## Config (`report:`)
+
+`deploy_folds`, `n_boot`, `n_background`, `n_permutations`, `top_k`, `context_column`, `small_group`, `risk_quantiles`, `risk_labels`, `cause_member`, `example_quantiles`.
+
+## Tests (`tests/test_report.py`)
+
+- **Wording:** flipping a difference or p-value changes the report's conclusion, the verdict depends on the metric's direction, and both sides use the same metric.
+- **Shapley values:** contributions are exactly additive, and match w·(x − mean) for a linear model.
+- **Deployment and patient records:**
+  - probabilities lie in [0, 1] and intervals are ordered;
+  - contributions plus the base value equal the model's log-odds;
+  - a single-patient call matches the batch output;
+  - out-of-range inputs are flagged and missing inputs are echoed with their handling.

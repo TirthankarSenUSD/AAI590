@@ -75,7 +75,30 @@ class _TorchBase(BaseEstimator, ClassifierMixin):
             net.load_state_dict(best_state)
             net.eval()
             self.nets_.append(net)
+        self.n_inputs_ = X.shape[1]
         return self
+
+    # Fitted networks are saved as weights and rebuilt on load: the network classes are built inside
+    # functions (torch is imported lazily), which plain pickle cannot locate.
+    def __getstate__(self):
+        state = super().__getstate__()
+        if "nets_" in state:
+            state = dict(state)
+            state["_net_states"] = [{k: v.detach().clone() for k, v in n.state_dict().items()} for n in state.pop("nets_")]
+        return state
+
+    def __setstate__(self, state):
+        states = state.pop("_net_states", None)
+        super().__setstate__(state)
+        if states is not None:
+            torch = _torch()
+            dummy = np.zeros((1, self.n_inputs_), dtype=np.float32)
+            self.nets_ = []
+            for sd in states:
+                net = self._build(torch, dummy)
+                net.load_state_dict(sd)
+                net.eval()
+                self.nets_.append(net)
 
     def predict_proba(self, X):
         torch = _torch()
