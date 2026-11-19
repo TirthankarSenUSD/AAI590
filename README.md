@@ -34,8 +34,8 @@ Each stage lives in its own folder under `src/metabric/`, with a `README.md` tha
 | 2 | Evaluation harness | Nested CV scoring, selection rule, floors, statistical checks | `harness` | built | [harness/README.md](src/metabric/harness/README.md) |
 | 3 | Model farm | Seven models (four classical, three neural) across data arms | `farm` | built | [farm/README.md](src/metabric/farm/README.md) |
 | 4 | Importance | Gates, SHAP and permutation importance, partial dependence, interactions | `importance` | built | [importance/README.md](src/metabric/importance/README.md) |
-| 5 | Ensemble | Fused arm, agreement merge, stacker | – | planned | [ensemble/README.md](src/metabric/ensemble/README.md) |
-| 6 | Agreement | Model-agreement analysis and the omics ablation | – | planned | [agreement/README.md](src/metabric/agreement/README.md) |
+| 5 | Ensemble | Fused arm, agreement merge, stacker, final model and regression floor | `ensemble` | built | [ensemble/README.md](src/metabric/ensemble/README.md) |
+| 6 | Agreement | Model-agreement analysis, disagreement flag, cause breakdown, omics ablation | `agreement` | built | [agreement/README.md](src/metabric/agreement/README.md) |
 | 7 | Report | Generated validation report and patient-level output | – | planned | [report/README.md](src/metabric/report/README.md) |
 | P2 | Phase 2 | Survival analysis on the same splits | – | planned | [phase2/README.md](src/metabric/phase2/README.md) |
 

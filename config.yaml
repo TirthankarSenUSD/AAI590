@@ -35,6 +35,7 @@ cv:
 # Evaluation harness (CLAUDE.md section 7, PLAN.md section 6). Thresholds fixed before any real run.
 harness:
   operating_point_sensitivity: 0.80 # threshold fixed on inner-fold predictions, applied to the outer fold
+  f1_operating_point: true          # secondary operating point: F1-maximising threshold on inner folds (owner, F-055)
   recalibration: platt              # fitted on inner out-of-fold predictions, inside the outer fold
   reliability_bins: 10              # quantile bins
   n_boot: 200                       # bootstrap resamples for subgroup intervals
@@ -66,6 +67,8 @@ farm:
     RNA: {blocks: [rna], rna_reps: [all, top30, pca10, hallmark, modules, dae8], neural: false}
     RNA+DNA: {blocks: [rna, dna], rna_reps: [pca10, hallmark], dna_reps: [flags, known5, pathway], neural: false}
     DNA: {blocks: [dna], dna_reps: [flags, known5, count, pathway, bagemb], neural: false}
+    fused: {blocks: [clinical, rna, dna], rna_reps: [top15], dna_reps: [known5], neural: false}   # step 5 fused arm (F-057)
+    C_diag: {blocks: [clinical], drop: [treatment]}   # at diagnosis: clinical without treatment columns (ablation step 1; F-059)
   # one column per concept (F-039): oncotree_code == cancer_type_detailed, which
   # tumor_other_histologic_subtype determines; cancer_type has one sarcoma; NPI is a composite of
   # size, nodes and grade (floor only)
@@ -134,6 +137,36 @@ importance:
   ice_rows: 50                      # patients drawn for ICE curves (split r0o0)
   h_rows: 60                        # held-out patients per split for the H-statistic
   learning_curve_fractions: [0.25, 0.5, 0.75, 1.0]
+
+# Fusion and ensemble (step 5). Member winners come from farm runs; everything is redone inside every outer fold.
+ensemble:
+  arms: [C, C+RNA, strict_clinical, fused]
+  members: [logreg_en, svm_rbf, random_forest, xgboost, mlp, mlp_embed, multimodal, logreg_cause, xgboost_cause]
+  merge_spearman: 0.95              # members with more similar predictions are merged, weighted by (AUROC - 0.5)
+  stacker_l2: 1.0                   # L2 penalty of the non-negative stacker (on member logits)
+  option_cv_folds: 3                # second-level CV on the inner out-of-fold predictions to choose the option
+  cross_arm_baseline: C             # final arm: C unless another arm is significantly better (owner, F-055)
+  significance: 0.05
+
+# Model agreement (step 6). Reads farm and importance runs; adds two small refit analyses.
+agreement:
+  arms: [C, C+RNA, strict_clinical]
+  members: [logreg_en, svm_rbf, random_forest, xgboost, mlp, mlp_embed, multimodal, logreg_cause, xgboost_cause]
+  top_n: 10
+  n_boot: 500                       # bootstrap for the disagreement-vs-error test
+  loco_arm: C                       # leave-one-cohort-out check of the consensus features
+  loco_members: [logreg_en, random_forest, xgboost, mlp]
+  consensus_k: 5
+  n_repeats: 5
+  cause_procedure: C|logreg_cause   # cause-specific risk breakdown (F-058)
+  ablation:                         # (procedure, baseline): clinical at diagnosis -> + treatment -> + DNA -> + RNA -> + both
+    - [C_diag|best, null]
+    - [C|best, C_diag|best]
+    - [C+DNA|best, C|best]
+    - [C+RNA|best, C|best]
+    - [C+RNA+DNA|best, C+RNA|best]
+    - [C+RNA+DNA|best, C|best]
+    - [strict_clinical|best, C|best]
 
 # Floors: always reported, never eligible to win (CLAUDE.md section 5). Built in step 2.
 floors:

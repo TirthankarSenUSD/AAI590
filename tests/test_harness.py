@@ -14,7 +14,7 @@ from metabric.harness import metrics as M
 from metabric.harness import Candidate, Harness, Split, check_split_hygiene, select_candidate
 from metabric.core.stats import corrected_resampled_ttest
 
-HCFG = {"harness": {"operating_point_sensitivity": 0.8, "recalibration": "platt", "reliability_bins": 10, "n_boot": 50,
+HCFG = {"harness": {"operating_point_sensitivity": 0.8, "f1_operating_point": True, "recalibration": "platt", "reliability_bins": 10, "n_boot": 50,
                     "n_permutations": 10, "chance_band": 0.03, "select_within_se": 1.0,
                     "learning_curve_fractions": [0.5, 1.0],
                     "overfit_gate": {"max_train_cv_auroc_gap": 0.05, "min_calibration_slope": 0.8,
@@ -163,6 +163,11 @@ def test_calibration_metrics_on_calibrated_probabilities():
     assert abs(base["brier_skill"]) < 1e-9 and base["auroc"] == 0.5
     t = M.threshold_for_sensitivity(y, p, 0.8)
     assert M.threshold_metrics(y, p, t)["sensitivity"] >= 0.8
+    t1 = M.threshold_for_f1(y, p)                     # F1-optimal threshold beats nearby thresholds
+    f = lambda th: M.threshold_metrics(y, p, th)["f1"]  # noqa: E731
+    assert f(t1) >= max(f(t1 - 0.05), f(t1 + 0.05)) - 1e-12
+    m = M.threshold_metrics([1, 1, 0, 0], [0.9, 0.2, 0.8, 0.1], 0.5)
+    assert m["f1"] == pytest.approx(2 * 0.5 * 0.5 / (0.5 + 0.5))
 
 
 def test_real_floors_on_frozen_splits(cfg, ds):

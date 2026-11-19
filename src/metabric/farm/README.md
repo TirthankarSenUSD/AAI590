@@ -4,6 +4,7 @@
 - **Step 3a:** four classical members — elastic-net logistic regression, RBF SVM, random forest, XGBoost.
 - **Step 3b:** three neural members — MLP, MLP with categorical embeddings, multimodal network.
 - **Step 3c:** all eight data arms, plus the RNA and DNA representation arms.
+- **Cause-specific members:** `logreg_cause` and `xgboost_cause`, trained on alive / cancer death / other-cause death and scored as death.
 
 **Command:** `python run.py farm`, optionally with `--members logreg_en,xgboost` or `--arms C,C+RNA`.
 
@@ -16,6 +17,7 @@ The farm builds many candidate configurations (arm × member × RNA/DNA represen
 | `preprocess.py` | In-fold preprocessing (all scikit-learn transformers, so the harness fits them on training rows only). |
 | `members.py` | Builds the candidate grid: estimators, the complexity order, and the parallel worker count. |
 | `neural.py` | The three PyTorch members as scikit-learn-compatible classifiers. |
+| `cause.py` | The cause-specific wrapper: a 3-class model whose P(death) = P(cancer death) + P(other-cause death). |
 | `representations.py` | RNA and DNA representation transformers (gene-set scores, modules, denoising autoencoder; driver genes, count, pathway flags, bag-of-mutations embedding). |
 | `stage.py` | `run_farm()`: scoring, procedures, comparisons, permutation test, figures and the generated summary. |
 
@@ -80,6 +82,8 @@ On the five newer arms the neural members are deferred to the final high-budget 
 | `mlp` | hidden ∈ {[32], [64, 32]}, dropout 0.3, weight decay 1e-3 | linear preprocessing (one-hot, scaled) |
 | `mlp_embed` | hidden ∈ {[32], [64, 32]}, dropout 0.3, weight decay 1e-3 | one learned embedding per categorical column (codes last; 0 = unseen level) |
 | `multimodal` | block dropout ∈ {0.1, 0.3}, dropout 0.3, weight decay 1e-3 | one encoder per block (clinical 16, RNA 32 units); C+RNA only; all genes |
+| `logreg_cause` | as `logreg_en` | multinomial; C, C+RNA (pca10, dae8) and strict-clinical |
+| `xgboost_cause` | as `xgboost` | multi:softprob; same arms and representations |
 
 **Neural guard rails** (`farm.neural`):
 - AdamW with weight decay, and dropout.
@@ -90,6 +94,15 @@ On the five newer arms the neural members are deferred to the final high-budget 
 On C+RNA the MLPs use only the `all` and `pca10` representations (`farm.neural_rna_representations`).
 
 The full grid is 826 configurations: C 24, C+RNA 222, strict-clinical 24, C+DNA 100, C+RNA+DNA 120, RNA 116, RNA+DNA 120, DNA 100. Age enters as a plain linear term (no spline for now).
+
+## Cause-specific members
+
+The label `death_from_cancer` (alive / died of disease / died of other causes) is used **only to train** these two members, inside the folds. It is never an input, and every metric is computed on binary death as for all other members.
+
+- **Why:** age mainly predicts other-cause death and tumour burden mainly predicts cancer death. Two cause-specific scores combine as "high risk through either route", which one additive score can only approximate.
+- **Fair comparison:** each cause member is compared with its binary counterpart on the same inputs (on C+RNA via `<arm>|<member>@cause_reps`).
+- **Permutation test:** it shuffles the full 3-class label.
+- **Result** (F-054): all six comparisons are positive, about +0.005 AUROC, two of them significant. The 1-SE rule still prefers the simpler binary logistic regression for the arm headline.
 
 ## Selection and "simpler"
 

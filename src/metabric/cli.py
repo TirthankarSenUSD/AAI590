@@ -132,9 +132,36 @@ def cmd_importance(args) -> str:
     from .importance.stage import run_importance
     cfg = load_config()
     run = Run(cfg, "importance" + (f" --farm-run {args.farm_run}" if args.farm_run else "")
-              + (f" --reuse {args.reuse}" if args.reuse else ""))
+              + (f" --reuse {args.reuse}" if args.reuse else "")
+              + (f" --procedures {','.join(args.procedures)}" if args.procedures else ""))
     try:
-        run_importance(cfg, run, args.farm_run, args.reuse)
+        run_importance(cfg, run, args.farm_run, args.reuse, args.procedures)
+        run.finalize()
+    except BaseException as exc:
+        run.fail(exc)
+        raise
+    return run.run_id
+
+
+def cmd_ensemble(args) -> str:
+    from .ensemble.stage import run_ensemble
+    cfg = load_config()
+    run = Run(cfg, f"ensemble --farm-runs {','.join(args.farm_runs)}")
+    try:
+        run_ensemble(cfg, run, args.farm_runs)
+        run.finalize()
+    except BaseException as exc:
+        run.fail(exc)
+        raise
+    return run.run_id
+
+
+def cmd_agreement(args) -> str:
+    from .agreement.stage import run_agreement
+    cfg = load_config()
+    run = Run(cfg, f"agreement --farm-runs {','.join(args.farm_runs)} --importance-run {args.importance_run}")
+    try:
+        run_agreement(cfg, run, args.farm_runs, args.importance_run)
         run.finalize()
     except BaseException as exc:
         run.fail(exc)
@@ -170,11 +197,20 @@ def main(argv=None) -> int:
     imp = sub.add_parser("importance", help="gates and feature importance of a completed farm run's winners")
     imp.add_argument("--farm-run", default=None, help="farm run id (default: the newest completed farm run)")
     imp.add_argument("--reuse", default=None, help="importance run id whose per-split tables are reused (skips the refits)")
+    imp.add_argument("--procedures", type=lambda s: s.split(","), default=None,
+                     help="explain only these procedures, e.g. C|logreg_cause (no partial-dependence pass)")
+    en = sub.add_parser("ensemble", help="fusion and ensemble of the farm winners (step 5)")
+    en.add_argument("--farm-runs", type=lambda s: s.split(","), required=True,
+                    help="farm run ids holding the member winners; for each (arm, member) the first run listed wins")
+    ag = sub.add_parser("agreement", help="model-agreement analysis and the omics ablation (step 6)")
+    ag.add_argument("--farm-runs", type=lambda s: s.split(","), required=True,
+                    help="farm runs with per-patient predictions; for each procedure the first run listed wins")
+    ag.add_argument("--importance-run", required=True, help="importance run with permutation importance")
     e = sub.add_parser("eda", help="rerunnable EDA stage")
     e.add_argument("--mode", choices=["descriptive", "modelling", "both"], default="both")
     args = p.parse_args(argv)
     rid = {"crosswalk": cmd_crosswalk, "holdout": cmd_holdout, "splits": cmd_splits, "harness": cmd_harness,
-           "farm": cmd_farm, "importance": cmd_importance, "eda": cmd_eda}[args.cmd](args)
+           "farm": cmd_farm, "importance": cmd_importance, "ensemble": cmd_ensemble, "agreement": cmd_agreement, "eda": cmd_eda}[args.cmd](args)
     print(f"run complete: outputs/{rid}")
     return 0
 

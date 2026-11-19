@@ -141,6 +141,9 @@ def _score_candidate(c: Candidate, X: pd.DataFrame, y_in: pd.Series, splits: lis
         if not light:
             t = M.threshold_for_sensitivity(ytr.loc[oof.index], oof.to_numpy(), h["operating_point_sensitivity"])
             rec.update({f"op_{k}": v for k, v in M.threshold_metrics(yte, p_te, t).items()})
+            if h.get("f1_operating_point", False):        # secondary: threshold maximising F1 on inner folds
+                t1 = M.threshold_for_f1(ytr.loc[oof.index], oof.to_numpy())
+                rec.update({f"opf1_{k}": v for k, v in M.threshold_metrics(yte, p_te, t1).items()})
             cal = LogisticRegression(C=M.BIG_C, max_iter=1000).fit(M.logit(oof.to_numpy()).reshape(-1, 1), ytr.loc[oof.index])
             p_rc = cal.predict_proba(M.logit(p_te).reshape(-1, 1))[:, 1]
             rec.update({f"recal_{k}": v for k, v in M.binary_metrics(yte, p_rc, prev).items()
@@ -297,7 +300,8 @@ class Harness:
     # -- summaries ---------------------------------------------------------------------------
     METRICS = ("auroc", "auprc", "log_loss", "brier", "brier_skill", "cal_intercept", "cal_slope",
                "recal_brier", "recal_cal_slope", "recal_cal_intercept", "train_auroc", "inner_auroc", "optimism",
-               "op_sensitivity", "op_specificity", "op_ppv", "op_npv")
+               "op_sensitivity", "op_specificity", "op_ppv", "op_npv", "op_f1",
+               "opf1_threshold", "opf1_sensitivity", "opf1_specificity", "opf1_ppv", "opf1_npv", "opf1_f1")
 
     def summarise(self, folds: pd.DataFrame) -> pd.DataFrame:
         rows = []

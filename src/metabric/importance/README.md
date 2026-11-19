@@ -1,6 +1,6 @@
 # importance: gates and feature importance
 
-**Status:** built (build step 4). **Command:** `python run.py importance [--farm-run RUN_ID]`. The default is the newest completed farm run.
+**Status:** built (build step 4). **Command:** `python run.py importance [--farm-run RUN_ID] [--reuse RUN_ID] [--procedures A,B]`. The default is the newest completed farm run. `--reuse` rebuilds the summaries and the detail pass from an earlier run's per-split tables, skipping the refits. `--procedures` explains only the named procedures, for example `C|logreg_cause`, with no detail pass.
 
 This stage explains what the models chosen by the farm rely on.
 
@@ -35,7 +35,7 @@ This stage explains what the models chosen by the farm rely on.
 | **Permutation importance** | every member, arms C, C+RNA and strict-clinical | AUROC drop when a column, or a group of correlated genes, is shuffled on the held-out rows (5 repeats). Gene groups are built on the outer training rows: average linkage on 1 − \|r\|, cut at 0.5; genes in a group share its value. |
 | **Importance by data block** | every member, those arms plus C+RNA+DNA | Shuffle a whole block: all clinical columns, the treatment group, all RNA, all DNA. |
 | **SHAP** | logistic regression (exact linear) and random forest / XGBoost (TreeSHAP) only | Mean \|SHAP\| per source column on the held-out rows; one-hot levels are summed back to their column. Values describe the model's own inputs (for example "RNA latent 3" when the winner uses autoencoder features). Scales differ between members, so only ranks are compared. |
-| **Coefficients and odds ratios** | logistic regression | Per split. Summarised as mean, SD, sign consistency across splits, and odds ratio (per SD for scaled inputs, per level for indicators). |
+| **Coefficients and odds ratios** | logistic regression (binary: death vs alive; cause-specific: cancer death vs alive and other-cause death vs alive) | Per split. Summarised as mean, SD, sign consistency across splits, and odds ratio (per SD for scaled inputs, per level for indicators). |
 | **Fold stability** | all of the above | Mean rank and the share of splits in which a feature is in the top 10. |
 | **Partial dependence and ICE** | the best-member procedure of each full arm, top 10 single-column features | Partial dependence: grids from the training rows (numeric: 5–95% quantiles), mean over held-out rows, summarised over splits by grid position. ICE: 50 held-out patients of split r0o0. |
 | **Interactions** | same top 10 | Friedman's H² for every pair, on 60 held-out patients per split. Model-agnostic, so every member is treated alike. |

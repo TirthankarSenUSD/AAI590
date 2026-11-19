@@ -82,13 +82,28 @@ def threshold_for_sensitivity(y, p, target: float) -> float:
     return float(pos[max(need, 1) - 1])
 
 
+def threshold_for_f1(y, p) -> float:
+    """Threshold maximising F1 (death = positive). Fit on inner-fold predictions only; ties -> the
+    higher threshold. A secondary operating point, never the headline (A11)."""
+    y, p = np.asarray(y, int), np.asarray(p, float)
+    order = np.argsort(-p, kind="mergesort")
+    ys, ps = y[order], p[order]
+    tp = np.cumsum(ys)
+    k = np.arange(1, len(ys) + 1)                      # predicted positives when cutting after rank k
+    f1 = 2 * tp / (k + ys.sum())
+    last = np.r_[ps[1:] != ps[:-1], True]              # only cut between distinct scores
+    f1 = np.where(last, f1, -1)
+    return float(ps[int(np.argmax(f1))])
+
+
 def threshold_metrics(y, p, t: float) -> dict:
     y, pred = np.asarray(y, int), np.asarray(p, float) >= t
     tp, fp = int((pred & (y == 1)).sum()), int((pred & (y == 0)).sum())
     fn, tn = int((~pred & (y == 1)).sum()), int((~pred & (y == 0)).sum())
     div = lambda a, b: a / b if b else float("nan")  # noqa: E731
-    return {"threshold": t, "sensitivity": div(tp, tp + fn), "specificity": div(tn, tn + fp),
-            "ppv": div(tp, tp + fp), "npv": div(tn, tn + fn)}
+    sens, ppv = div(tp, tp + fn), div(tp, tp + fp)
+    return {"threshold": t, "sensitivity": sens, "specificity": div(tn, tn + fp), "ppv": ppv, "npv": div(tn, tn + fn),
+            "f1": div(2 * tp, 2 * tp + fp + fn)}
 
 
 def bootstrap_auroc_ci(y, p, n_boot: int, rng: np.random.Generator) -> tuple[float, float]:

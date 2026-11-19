@@ -26,7 +26,9 @@ from ..harness.floors import design_matrix
 from ..splits import load_cv_splits, training_ids
 from . import explain as E
 
-MATCH_SECTIONS = ("farm", "harness", "columns", "seed", "clinical_types", "groups", "cv", "holdout")
+# sections that decide how a winner is built and fitted (the harness section only affects scoring,
+# and the winners are already chosen), so they must match the farm run for exact refits
+MATCH_SECTIONS = ("farm", "columns", "seed", "clinical_types", "groups", "cv", "holdout")
 
 
 def find_farm_run(cfg: Config, run_id: str | None) -> str:
@@ -138,7 +140,8 @@ def _parallel(fn, tasks, n_jobs, log, label):
 REUSE_TABLES = ("refit_check", "modality_importance", "permutation_importance", "shap_values_by_split", "lr_coefficients")
 
 
-def run_importance(cfg: Config, run: Run, farm_run: str | None = None, reuse: str | None = None) -> dict:
+def run_importance(cfg: Config, run: Run, farm_run: str | None = None, reuse: str | None = None,
+                   procedures: list[str] | None = None) -> dict:
     """`reuse`: an earlier importance run on the same farm run whose per-split tables (pass 1: refits,
     permutation importance, SHAP, coefficients) are reused, so only the summaries and the detail pass
     are recomputed. The reused tables are recorded as inputs."""
@@ -156,15 +159,23 @@ def run_importance(cfg: Config, run: Run, farm_run: str | None = None, reuse: st
     run.record_input(cfg.path("cv_splits"), "frozen CV splits")
     ds = full.subset(tr_ids)
     X, y = design_matrix(ds), ds.y
-    y_cause = None
-    if any(m.member in ("logreg_cause", "xgboost_cause") for m in build_candidates(cfg, arms=list(ic["arms_full"]) +
-                                                                                     list(ic["arms_modality_only"]))[1].values()):
+    from ..farm.members import CAUSE
+    members_all = list(dict.fromkeys(list(cfg["farm"]["members"]) + list(CAUSE)))   # every member a farm run can hold
+    y_cause = None                                     # cause label (training only) for cause-specific winners
+    if win.winner.str.split("|").str[1].isin(list(CAUSE)).any():
         from ..farm.cause import cause_labels
         y_cause = cause_labels(ds.frame)
     fit_y = lambda cand, rows: (y_cause if cand.target == "cause" else y).loc[rows]  # noqa: E731
     splits = {s.split_id: s for s in splits_from_table(load_cv_splits(cfg, tr_ids))}
     arms = list(ic["arms_full"]) + list(ic["arms_modality_only"])
-    cands, meta = build_candidates(cfg, arms=arms)
+    if procedures:                       # explain only these procedures (full mode); no detail pass
+        missing = sorted(set(procedures) - set(win.procedure))
+        if missing:
+            raise ValueError(f"procedures not in farm run {farm_id}: {missing}")
+        win = win[win.procedure.isin(procedures)]
+        arms = list(dict.fromkeys(pr.split("|")[0] for pr in procedures))
+        ic = {**ic, "arms_full": arms, "arms_modality_only": []}
+    cands, meta = build_candidates(cfg, members=members_all, arms=arms)
     by_name = {c.name: c for c in cands}
     n_jobs = resolve_n_jobs(cfg)
     s = {"seed": cfg.seed, "n_repeats": ic["n_repeats"], "distance_cut": ic["gene_groups"]["distance_cut"],
@@ -263,11 +274,12 @@ def run_importance(cfg: Config, run: Run, farm_run: str | None = None, reuse: st
     top = {}
     for arm in ic["arms_full"]:
         si = summ[(summ.procedure == f"{arm}|best") & (summ.n_columns == 1)].sort_values("mean", ascending=False)
-        top[arm] = si.item.head(ic["top_n"]).tolist()
+        if len(si):
+            top[arm] = si.item.head(ic["top_n"]).tolist()
     st.table("top_features", pd.DataFrame([{"arm": a, "rank": i + 1, "feature": f} for a, fs in top.items() for i, f in enumerate(fs)]),
              f"Top {ic['top_n']} single-column features of each best-member procedure (by mean permutation importance)")
     dtasks, dkeys = [], []
-    for arm in ic["arms_full"]:
+    for arm in top:
         for r in full_pk[full_pk.procedure == f"{arm}|best"].itertuples():
             sp = splits[r.split_id]
             dtasks.append([(r.winner, r.split_id, arm), by_name[r.winner], top[arm], X.loc[sp.train],
@@ -445,8 +457,10 @@ def _figures(st, summ, coef_s, pdp, ice, hs, modality, lc, top, ic):
                       f"Friedman H² between the top {len(feats)} features of the {arm} best-member procedure (0 = additive)")
     mod = modality.groupby(["arm", "procedure", "group"]).importance.mean().reset_index()
     mod = mod[~mod.procedure.str.endswith("|best")]
+    arms_m = []
     if len(mod):
         arms_m = [a for a in ["C+RNA", "C+RNA+DNA"] if a in set(mod.arm)]
+    if len(mod) and arms_m:
         fig, axes = P.fig(6.5 * len(arms_m), 3.6, 1, len(arms_m), squeeze=False)
         for ax, arm in zip(axes.flat, arms_m):
             m = mod[mod.arm == arm].pivot(index="procedure", columns="group", values="importance").fillna(0)
@@ -485,12 +499,18 @@ def _facts(summ, coef_s, shap_s, hs, modality, lc, top, farm_id, n_tasks, secs, 
         F[f"{arm}_top5"] = [{"item": i, "mean": round(m, 4), "top_share": round(s, 2)} for i, m, s in zip(t.item, t["mean"], t.top_share)]
         h = hs[hs.arm == arm].head(3)
         F[f"{arm}_h_top"] = [{"pair": f"{a} x {b}", "h2": round(v, 3)} for a, b, v in zip(h.feature_a, h.feature_b, h["mean"])]
-        l = lc[lc.arm == arm].groupby("fraction").cv_auroc.mean()
+        l = lc[lc.arm == arm].groupby("fraction").cv_auroc.mean() if len(lc) else pd.Series(dtype=float)
         F[f"{arm}_lc"] = {float(k): round(v, 4) for k, v in l.items()}
     mod = modality.groupby(["arm", "procedure", "group"]).importance.mean()
     F["modality_best"] = {f"{a}|{g}": round(v, 4) for (a, p, g), v in mod.items() if p.endswith("|best")}
     c = coef_s[(coef_s.arm == "C") & (coef_s.procedure == "C|logreg_en")].head(5) if not coef_s.empty else pd.DataFrame()
     F["C_lr_top"] = [{"feature": f, "or": round(o, 3), "sign": round(sc, 2)} for f, o, sc in zip(c.feature, c.odds_ratio, c.sign_consistency)]
+    F["cause_or"] = {}
+    if not coef_s.empty:
+        for (pr, ct), g in coef_s[coef_s.procedure.str.endswith("|logreg_cause")].groupby(["procedure", "contrast"]):
+            g = g.assign(a=g["mean"].abs()).sort_values("a", ascending=False).head(6)
+            F["cause_or"][f"{pr} | {ct}"] = [{"feature": f, "or": round(o, 3), "sign": round(sc, 2)}
+                                             for f, o, sc in zip(g.feature, g.odds_ratio, g.sign_consistency)]
     if len(shap_s):
         agree = []
         for arm in ic["arms_full"]:
@@ -508,7 +528,7 @@ def _summary_md(run, cfg, F, ic) -> str:
          f"Run `{run.run_id}`, config hash `{cfg.hash}`. Explains the winners chosen inside each outer fold by farm run "
          f"`{F['farm_run']}`: {F['n_refits']} refits, each identical to the farm fit (checked), explained on held-out rows only "
          f"({F['seconds'] // 60} min). Training rows only; the holdout is untouched.", ""]
-    for arm in ic["arms_full"]:
+    for arm in [a for a in ic["arms_full"] if F[f"{a}_top5"]]:
         L.append(f"## {arm} (best-member procedure)")
         L.append("- Top features by permutation importance (AUROC drop; share of splits in the top "
                  f"{ic['top_n']}): " + "; ".join(f"{t['item']} {t['mean']:.3f} ({t['top_share']:.0%})" for t in F[f"{arm}_top5"]) + ".")
@@ -528,6 +548,12 @@ def _summary_md(run, cfg, F, ic) -> str:
         L += ["## Logistic regression (clinical arm)",
               "- Largest odds ratios (per SD or per level; sign consistency across splits): "
               + "; ".join(f"{c['feature']} {c['or']:.2f} ({c['sign']:.0%})" for c in F["C_lr_top"]) + ".", ""]
+    if F.get("cause_or"):
+        L += ["## Cause-specific logistic regression: odds ratios by cause",
+              "Contrasts against alive (per SD for scaled inputs, per level for indicators; sign consistency across splits)."]
+        for k, rows in F["cause_or"].items():
+            L.append(f"- {k}: " + "; ".join(f"{r['feature']} {r['or']:.2f} ({r['sign']:.0%})" for r in rows) + ".")
+        L.append("")
     mb = F["modality_best"]
     if mb:
         L += ["## Reliance on each data block (best-member procedures)",

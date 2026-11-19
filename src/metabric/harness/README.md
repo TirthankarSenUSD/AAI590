@@ -9,7 +9,7 @@ Every model from the farm onward is scored here, on the same frozen splits, by t
 | File | What it does |
 |---|---|
 | `core.py` | `Candidate`, `Split`, `Harness`, the selection rule, split-hygiene checks and all evaluations. |
-| `metrics.py` | Probability metrics: AUROC, AUPRC, log loss, Brier and Brier skill, calibration intercept and slope, reliability bins, the operating-point threshold and its metrics, bootstrap AUROC intervals. |
+| `metrics.py` | Probability metrics: AUROC, AUPRC, log loss, Brier and Brier skill, calibration intercept and slope, reliability bins, the operating-point thresholds (fixed sensitivity; maximum F1) and their metrics (incl. F1), bootstrap AUROC intervals. |
 | `floors.py` | `design_matrix()` (clinical + RNA + mutation flags + the derived `npi_standard`; never outcome columns) and the four floors. |
 | `stage.py` | `run_harness()`: runs the floors on the training rows and writes every artifact plus a generated summary. |
 
@@ -29,7 +29,8 @@ For each of the 10 frozen outer splits:
 3. **Outer layer:**
    - fit on all outer training rows and predict the outer test rows;
    - compute the metrics, using the training-fold prevalence as the Brier reference so no test label enters it;
-   - apply the inner threshold to get sensitivity, specificity, PPV and NPV;
+   - apply the inner threshold to get sensitivity (recall), specificity, PPV (precision), NPV and F1;
+   - a secondary operating point, the threshold maximising F1 on the inner folds (`opf1_*`; never the headline);
    - apply the recaliber to get the recalibrated metrics;
    - record the training-row AUROC (for the overfit gate) and the optimism (inner minus outer AUROC).
 
