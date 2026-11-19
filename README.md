@@ -17,8 +17,9 @@ A reproducible machine-learning pipeline that predicts overall survival in breas
 | 3b | Model farm: neural members (MLP, MLP with embeddings, multimodal) | done |
 | 3c | Model farm: all eight data arms, RNA and DNA representations | done |
 | 4 | Gates and importance | done |
-| 5 | Ensemble | next |
-| 6–7 | Model-agreement analysis, report | planned |
+| 5 | Ensemble and final model | done |
+| 6 | Model-agreement analysis and omics ablation | done |
+| 7 | Report and patient output | next |
 
 ## Pipeline stages
 

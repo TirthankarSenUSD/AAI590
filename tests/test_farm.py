@@ -74,7 +74,7 @@ def test_candidate_grid_counts(cfg):
     cands, meta = build_candidates(cfg)
     by_arm = pd.Series([m.arm for m in meta.values()]).value_counts().to_dict()
     assert by_arm == {"C": 24, "C+RNA": 222, "strict_clinical": 24, "C+DNA": 100, "C+RNA+DNA": 120,
-                      "RNA": 116, "RNA+DNA": 120, "DNA": 100}            # 3a + 3b + 3c
+                      "RNA": 116, "RNA+DNA": 120, "DNA": 100, "fused": 20, "C_diag": 24}   # 3a-3c + fused + at diagnosis
     assert len({c.name for c in cands}) == len(cands)
     lr = [c for c in cands if meta[c.name].member == "logreg_en"]
     xgb = [c for c in cands if meta[c.name].member == "xgboost"]

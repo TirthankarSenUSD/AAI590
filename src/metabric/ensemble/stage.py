@@ -61,8 +61,13 @@ def run_ensemble(cfg: Config, run: Run, farm_runs: list[str]) -> dict:
         wins.append(w.assign(farm_run=fr))
     w = pd.concat(wins, ignore_index=True)
     w["arm"], w["member"] = w.procedure.str.split("|").str[0], w.procedure.str.split("|").str[1]
+    # late fusion: each source data type's best-member procedure becomes one "member" of the pseudo-arm
+    late = w[w.procedure.isin(ec.get("late_fusion", []))].drop_duplicates(["procedure", "split_id"], keep="first").copy()
+    late["member"], late["arm"] = late.arm, "late_fusion"
     w = w[w.arm.isin(ec["arms"]) & w.member.isin(ec["members"])]
     w = w.drop_duplicates(["arm", "member", "split_id"], keep="first")   # first listed run wins
+    if "late_fusion" in ec["arms"] and len(late):
+        w = pd.concat([w, late], ignore_index=True)
     arms = [a for a in ec["arms"] if a in set(w.arm)]
     full = load_dataset(cfg)
     tr_ids = training_ids(cfg, full)
@@ -75,12 +80,17 @@ def run_ensemble(cfg: Config, run: Run, farm_runs: list[str]) -> dict:
         from ..farm.cause import cause_labels
         y_cause = cause_labels(ds.frame)
     splits = {s.split_id: s for s in splits_from_table(load_cv_splits(cfg, tr_ids))}
-    cands, meta = build_candidates(cfg, members=list(dict.fromkeys(w.member)), arms=arms)   # only members with winners
+    src_arms = list(dict.fromkeys(w.winner.str.split("|").str[0]))      # arms the winners were built on
+    src_members = list(dict.fromkeys(w.winner.str.split("|").str[1]))
+    cands, meta = build_candidates(cfg, members=src_members, arms=src_arms)
     by_name = {c.name: c for c in cands}
     n_jobs = resolve_n_jobs(cfg)
 
-    tasks = []
+    tasks, seen = [], set()
     for r in w.itertuples():
+        if (r.winner, r.split_id) in seen:              # e.g. a late-fusion source equal to an arm's member winner
+            continue
+        seen.add((r.winner, r.split_id))
         c, sp = by_name[r.winner], splits[r.split_id]
         yfit = (y_cause if c.target == "cause" else y).loc[sp.train]
         tasks.append([(r.winner, r.split_id), c, X.loc[sp.train], yfit, X.loc[sp.test], y.loc[sp.test], sp.inner])
@@ -99,7 +109,8 @@ def run_ensemble(cfg: Config, run: Run, farm_runs: list[str]) -> dict:
     rows, chosen, weights, merges, div, drop = [], [], [], [], [], []
     for arm in arms:
         wa = w[w.arm == arm]
-        complexity = {m: FAMILY[m] for m in wa.member.unique()}
+        late_order = [p.split("|")[0] for p in ec.get("late_fusion", [])]
+        complexity = {m: FAMILY[m] if m in FAMILY else late_order.index(m) for m in wa.member.unique()}
         for sid, g in wa.groupby("split_id", sort=False):
             sp = splits[sid]
             members = list(g.member)

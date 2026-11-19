@@ -33,6 +33,10 @@ This stage combines the farm's members into ensembles, compares them with the be
 
 **How to read the two numbers:** the nested select-and-ensemble estimate is the honest one. The final model's own mean outer AUROC is reported next to it, and it is slightly optimistic because the option was chosen on those same outer scores.
 
+## Late fusion
+
+`late_fusion` is a pseudo-arm whose three "members" are the best-member procedures of the clinical-only, RNA-only and DNA-only arms (`ensemble.late_fusion`), each chosen inside the fold. They are combined by the same four options and in-fold choice, and the final-model rule treats the pseudo-arm like any arm. Together with C+RNA, C+RNA+DNA and fused (early fusion) and the multimodal network (intermediate fusion), it completes the omics test across fusion styles.
+
 ## Fused arm
 
 `fused` is a farm arm: clinical columns plus the top 15 genes (by selection frequency, inside the fold) plus the 5 known driver mutations, run with the four classical members. It enters the ensemble like any arm. The feature-disagreement diagnostic of PLAN section 7 is left to step 6 (agreement analysis).

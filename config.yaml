@@ -140,7 +140,8 @@ importance:
 
 # Fusion and ensemble (step 5). Member winners come from farm runs; everything is redone inside every outer fold.
 ensemble:
-  arms: [C, C+RNA, strict_clinical, fused]
+  arms: [C, C+RNA, C+RNA+DNA, strict_clinical, fused, late_fusion]
+  late_fusion: [C|best, RNA|best, DNA|best]   # late fusion: one model per data type, combined like members (F-061)
   members: [logreg_en, svm_rbf, random_forest, xgboost, mlp, mlp_embed, multimodal, logreg_cause, xgboost_cause]
   merge_spearman: 0.95              # members with more similar predictions are merged, weighted by (AUROC - 0.5)
   stacker_l2: 1.0                   # L2 penalty of the non-negative stacker (on member logits)

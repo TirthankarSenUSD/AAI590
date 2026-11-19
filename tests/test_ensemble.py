@@ -66,7 +66,8 @@ def test_ensemble_stage_end_to_end_small(tmp_project):
                     "xgboost": {"n_estimators": [20], "learning_rate": [0.1], "max_depth": [2], "subsample": [0.8],
                                 "colsample_bytree": [0.8], "min_child_weight": [5]}})
     c.raw["harness"].update(n_boot=10, chance_band=0.5)
-    c.raw["ensemble"].update(arms=["C", "strict_clinical"], members=["logreg_en", "logreg_cause", "xgboost"])
+    c.raw["ensemble"].update(arms=["C", "strict_clinical", "late_fusion"], members=["logreg_en", "logreg_cause", "xgboost"],
+                             late_fusion=["C|best", "strict_clinical|best"])
     c.file.write_text(yaml.safe_dump(c.raw), encoding="utf-8")
     c = Config(root=c.root, raw=yaml.safe_load(c.file.read_text(encoding="utf-8")))
     r1 = Run(c, "farm", run_id="farm_a")
@@ -79,9 +80,11 @@ def test_ensemble_stage_end_to_end_small(tmp_project):
     facts = run_ensemble(c, r3, ["farm_a", "farm_b"])
     r3.finalize()
     chk = pd.read_csv(r3.dir / "ensemble" / "tables" / "refit_check.csv")
-    assert chk.abs_diff.max() < 1e-6 and set(chk.member) == {"logreg_en", "xgboost", "logreg_cause"}
+    assert chk.abs_diff.max() < 1e-6 and set(chk[chk.arm != "late_fusion"].member) == {"logreg_en", "xgboost", "logreg_cause"}
     assert set(chk[chk.member == "logreg_en"].farm_run) == {"farm_a"}           # first listed run wins
     assert facts["final"]["arm"] == "C"                                         # baseline unless significantly beaten
     assert facts["final"]["regression_floor"] < facts["final"]["mean_outer_auroc"]
     F = pd.read_csv(r3.dir / "ensemble" / "tables" / "option_fold_metrics.csv")
-    assert set(F.candidate) >= {"C|best_single", "C|mean", "C|weighted", "C|stacker", "C|ensemble"}
+    assert set(F.candidate) >= {"C|best_single", "C|mean", "C|weighted", "C|stacker", "C|ensemble", "late_fusion|ensemble"}
+    lf = chk[chk.arm == "late_fusion"]
+    assert set(lf.member) == {"C", "strict_clinical"} and lf.abs_diff.max() < 1e-6       # one model per source arm

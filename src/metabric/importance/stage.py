@@ -160,7 +160,7 @@ def run_importance(cfg: Config, run: Run, farm_run: str | None = None, reuse: st
     ds = full.subset(tr_ids)
     X, y = design_matrix(ds), ds.y
     from ..farm.members import CAUSE
-    members_all = list(dict.fromkeys(list(cfg["farm"]["members"]) + list(CAUSE)))   # every member a farm run can hold
+    members_all = list(dict.fromkeys(win.winner.str.split("|").str[1]))   # only members that appear among the winners
     y_cause = None                                     # cause label (training only) for cause-specific winners
     if win.winner.str.split("|").str[1].isin(list(CAUSE)).any():
         from ..farm.cause import cause_labels
