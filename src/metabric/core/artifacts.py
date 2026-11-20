@@ -69,6 +69,10 @@ class Run:
             "packages": _pkg_versions(), "inputs": [], "external_artifacts": [], "artifacts": [],
         }
         self._stages: dict[str, Stage] = {}
+        # resumable: rerunning the same command with the same config and code reuses finished tasks
+        from . import checkpoint
+        self.checkpoint_dir = checkpoint.activate(self.outputs, cfg.hash, command)
+        self.manifest["checkpoints"] = self._rel(self.checkpoint_dir)
         self._write()
 
     # ------------------------------------------------------------------
@@ -151,6 +155,10 @@ class Run:
             self.manifest["problems"] = problems
             self._write()
             raise RuntimeError("manifest validation failed:\n" + "\n".join(problems))
+        from . import checkpoint
+        self.manifest["checkpoint_tasks"] = {k: v for k, v in checkpoint.stats().items() if k != "dir"}
+        checkpoint.deactivate(remove=True)                # finished: checkpoints are no longer needed
+        self.manifest.pop("checkpoints", None)
         self.manifest["status"] = "complete"
         self.manifest["completed"] = _now()
         self._write()
@@ -161,6 +169,9 @@ class Run:
     def fail(self, exc: BaseException) -> None:
         for st in self._stages.values():
             st._close_log()
+        from . import checkpoint
+        self.manifest["checkpoint_tasks"] = {k: v for k, v in checkpoint.stats().items() if k != "dir"}
+        checkpoint.deactivate(remove=False)               # kept: rerun the same command to resume
         self.manifest["status"] = "failed"
         self.manifest["error"] = f"{type(exc).__name__}: {exc}"
         self._write()

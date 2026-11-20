@@ -11,7 +11,7 @@ paths:
   reference: reference
   crosswalk: reference/crosswalk
   holdout: outputs/frozen/holdout.csv
-  cv_splits: outputs/frozen/cv_splits.csv
+  cv_splits: outputs/frozen/cv_splits_5x5.csv   # final run (F-068); the 5x2 file cv_splits.csv is kept for the earlier runs
 
 target:
   source_column: overall_survival   # file: 1 = alive, 0 = died
@@ -26,11 +26,11 @@ holdout:
 # Low compute budget (CLAUDE.md section 6). Used from build step 2 onward.
 cv:
   outer_folds: 5
-  outer_repeats: 2
+  outer_repeats: 5                  # final run A1 (F-068); was 2 (sha e4707dfe..., outputs/frozen/cv_splits.csv)
   inner_folds: 3
   first_arms: [C, C+RNA, strict_clinical]
   # seeds derived from `seed`: outer repeat r -> seed + r; inner split of (r, k) -> seed + 1000 * (r + 1) + k
-  splits_sha256: "e4707dfe840a54713856877d13cf0e4a5cc80dae8f78d41aeee16897a7ff562b"               # filled once when the CV splits are created; verified on every run
+  splits_sha256: "6388036cd6b9d1aff81822a97fb2f8fe79af4a77938b4edf5a59a9a1a74dea57"            # filled once when the CV splits are created; verified on every run
 
 # Evaluation harness (CLAUDE.md section 7, PLAN.md section 6). Thresholds fixed before any real run.
 harness:

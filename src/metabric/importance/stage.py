@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 import yaml
 
+from ..core import checkpoint
 from ..core.artifacts import Run
 from ..core.config import Config
 from ..data import load_dataset
@@ -121,16 +122,31 @@ def _detail_task(key, cand, cols_top, Xtr, ytr, Xte, yte, split_id, s):
 
 
 def _parallel(fn, tasks, n_jobs, log, label):
+    """Run `fn(*t)` for every task (t[0] is the task's key; results carry it as r["key"]).
+    Resumable: finished tasks are saved as they complete and skipped when the run is repeated."""
+    ck = checkpoint.Loop(f"parallel:{label}:{fn.__name__}")
     prog = _Progress(len(tasks), log, label)
-    res = []
-    if n_jobs == 1:
-        for t in tasks:
-            res.append(fn(*t))
+    res, todo = [], []
+    for t in tasks:
+        found, v = ck.get(t[0])
+        if found:
+            res.append(v)
+            prog.tick()
+        else:
+            todo.append(t)
+    if res and log:
+        log(f"{label}: resumed {len(res)}/{len(tasks)} tasks from checkpoints")
+    if n_jobs == 1 or len(todo) <= 1:
+        for t in todo:
+            r = fn(*t)
+            ck.put(r["key"], r)
+            res.append(r)
             prog.tick()
         return res
     from joblib import Parallel, delayed, parallel_config
     with parallel_config(backend="loky", inner_max_num_threads=1):
-        for r in Parallel(n_jobs=n_jobs, return_as="generator_unordered")(delayed(fn)(*t) for t in tasks):
+        for r in Parallel(n_jobs=n_jobs, return_as="generator_unordered")(delayed(fn)(*t) for t in todo):
+            ck.put(r["key"], r)
             res.append(r)
             prog.tick()
     return res

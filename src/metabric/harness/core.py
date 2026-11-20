@@ -9,6 +9,7 @@ Identical frozen splits for every candidate, so comparisons are paired.
 """
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
@@ -18,6 +19,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 
 from . import metrics as M
+from ..core import checkpoint
 from ..core.stats import corrected_resampled_ttest
 
 
@@ -275,20 +277,35 @@ class Harness:
             cols = list(dict.fromkeys(c for cand in cands for c in cand.columns))
             return k, cands, self.X[cols]
 
+        # resumable: finished groups are saved as they complete and skipped when the run is repeated
+        ck = checkpoint.Loop(f"evaluate:{label}")
+        yh = hashlib.sha256(y.to_numpy().tobytes() + pd.Index(y.index).to_numpy().tobytes()).hexdigest()[:16]
+        sids = tuple(s.split_id for s in self.splits)
+        ckey = {k: (tuple(candidates[i].name for i in g), sids, light, kw["need_inner"], yh) for k, g in enumerate(groups)}
         prog = _Progress(len(groups), log, label)
         gouts = {}
-        if n_jobs == 1 or len(groups) == 1:
-            for k, g in enumerate(groups):
+        for k in range(len(groups)):
+            found, v = ck.get(ckey[k])
+            if found:
+                gouts[k] = v
+                prog.tick()
+        if gouts and log:
+            log(f"{label}: resumed {len(gouts)}/{len(groups)} tasks from checkpoints")
+        todo = [(k, g) for k, g in enumerate(groups) if k not in gouts]
+        if n_jobs == 1 or len(todo) <= 1:
+            for k, g in todo:
                 _, out = _score_group(*task(k, g), y, kw)
                 gouts[k] = out
+                ck.put(ckey[k], out)
                 prog.tick()
         else:
             from joblib import Parallel, delayed, parallel_config
             with parallel_config(backend="loky", inner_max_num_threads=1):
                 it = Parallel(n_jobs=n_jobs, return_as="generator_unordered")(
-                    delayed(_score_group)(*task(k, g), y, kw) for k, g in enumerate(groups))
+                    delayed(_score_group)(*task(k, g), y, kw) for k, g in todo)
                 for k, out in it:                       # completion order; reassembled below
                     gouts[k] = out
+                    ck.put(ckey[k], out)
                     prog.tick()
         by_idx = {i: o for k, g in enumerate(groups) for i, o in zip(g, gouts[k])}
         outs = [by_idx[i] for i in range(len(candidates))]

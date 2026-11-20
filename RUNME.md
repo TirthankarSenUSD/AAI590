@@ -23,8 +23,24 @@ python run.py ensemble --farm-runs FARM_3C,FARM_CAUSE                     # 5: e
 python run.py agreement --farm-runs FARM_3C,FARM_CAUSE --importance-run IMP # 6: model agreement and the omics ablation
 python run.py report --farm-runs FARM_3C,FARM_CAUSE --ensemble-run ENS --agreement-run AGR
                                     # 7: validation report, final-model fit (models/final_model.joblib), patient output
-python -m pytest -q                 # 97 tests (about 15 min; includes small end-to-end farm, importance and ensemble runs)
+python -m pytest -q                 # 100 tests (about 10-15 min; includes small end-to-end farm, importance and ensemble runs)
 ```
+## Final run A1 (5x5 outer, 3 inner; about 14 h on 8 cores)
+Run in this order. Each line is one run; if one stops, rerun the same line (it resumes from its checkpoints).
+```
+python run.py harness
+python run.py eda --mode modelling
+python run.py farm --arms C            # then the same for C+RNA, strict_clinical, C+DNA, C+RNA+DNA, RNA, RNA+DNA, DNA, C_diag
+python run.py farm --members logreg_en,xgboost,logreg_cause,xgboost_cause --arms C,C+RNA,strict_clinical
+python run.py farm --members logreg_en,svm_rbf,random_forest,xgboost --arms fused
+python run.py ensemble  --farm-runs <the 11 farm run ids above, in that order>
+python run.py agreement --farm-runs <same list> --importance-run <importance run id>
+python run.py report    --farm-runs <same list> --ensemble-run <ensemble id> --agreement-run <agreement id>
+```
+
+- **Resuming:** if a run stops (crash, reboot), rerun the same command unchanged. Finished tasks are loaded from
+  `outputs/checkpoints/` and only the rest is computed; the results are identical. Do not edit `config.yaml` or the code
+  in between, or the run starts from scratch. The checkpoints are deleted when the run completes.
 - `holdout` and `splits` refuse to run if their file exists. Every later stage verifies both files against the hashes in `config.yaml`.
 - Harness outputs: `outputs/<run>/harness/tables/harness_summary.md` (generated summary), `summary.csv`, `paired_comparisons.csv`,
   `subgroup_metrics.csv`, `overfit_gate.csv`, `permutation_summary.csv`, `loco.csv`, `regression_floor.csv`, plus figures.
