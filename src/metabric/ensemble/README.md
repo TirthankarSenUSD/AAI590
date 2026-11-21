@@ -27,8 +27,8 @@ This stage combines the farm's members into ensembles, compares them with the be
 
 ## Final model (fixed rules)
 
-- **Arm (owner rule, F-055):** the baseline arm `C` (clinical only), unless another arm's select-and-ensemble procedure is significantly better (paired corrected t, p < 0.05 and CI above 0).
-- **Model within the arm (PLAN section 7, step 4):** the option with the highest mean outer AUROC; the simplest option within 1 SE wins.
+- **Arm:** the baseline arm `C` (clinical only), unless another arm's select-and-ensemble procedure is significantly better (paired corrected t, p < 0.05 and CI above 0).
+- **Model within the arm:** the option with the highest mean outer AUROC; the simplest option within 1 SE wins.
 - **Regression floor:** mean − 2 SD of that option's outer-fold AUROC. Later runs of the final model must not fall below it.
 
 **How to read the two numbers:** the nested select-and-ensemble estimate is the honest one. The final model's own mean outer AUROC is reported next to it, and it is slightly optimistic because the option was chosen on those same outer scores.
@@ -39,7 +39,7 @@ This stage combines the farm's members into ensembles, compares them with the be
 
 ## Fused arm
 
-`fused` is a farm arm: clinical columns plus the top 15 genes (by selection frequency, inside the fold) plus the 5 known driver mutations, run with the four classical members. It enters the ensemble like any arm. The feature-disagreement diagnostic of PLAN section 7 is left to step 6 (agreement analysis).
+`fused` is a farm arm: clinical columns plus the top 15 genes (by selection frequency, inside the fold) plus the 5 known driver mutations, run with the four classical members. It enters the ensemble like any arm. The feature-disagreement diagnostic is left to step 6 (agreement analysis).
 
 ## Outputs (`outputs/<run>/ensemble/`)
 

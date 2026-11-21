@@ -1,4 +1,4 @@
-"""Evaluation harness (build step 2; CLAUDE.md section 7, PLAN.md section 6).
+"""Evaluation harness (build step 2).
 
 Every fitted step happens inside a fold:
 - outer split: fit on the outer training rows, score the outer test rows;
@@ -363,7 +363,7 @@ class Harness:
         return pd.DataFrame(rows)
 
     def overfit_gate(self, folds: pd.DataFrame) -> pd.DataFrame:
-        """Two separate questions (F-042):
+        """Two separate questions:
         - overfitting: train-versus-CV AUROC gap above the limit, or calibration slope below the
           minimum (over-confident predictions) -> status 'overfit';
         - under-confidence: slope above `recalibrate_above_slope` -> status 'recalibrate', and the
@@ -409,7 +409,7 @@ class Harness:
 
     def permutation_test(self, procedure: Callable[[pd.Series], float], n_perm: int,
                          rng: np.random.Generator) -> tuple[pd.DataFrame, dict]:
-        """Run the full `procedure` on shuffled labels. It must score at chance (A6)."""
+        """Run the full `procedure` on shuffled labels. It must score at chance."""
         labels = self.y_cause if self.y_cause is not None else self.y   # permute the full label (cause included)
         obs = procedure(labels)
         perm = []
@@ -425,7 +425,7 @@ class Harness:
         return pt, summ
 
     def loco(self, candidates: list[Candidate], cohort: pd.Series) -> pd.DataFrame:
-        """Leave-one-cohort-out on the training rows (sensitivity analysis only, B8)."""
+        """Leave-one-cohort-out on the training rows (sensitivity analysis only)."""
         rows = []
         coh = cohort.loc[self.X.index].astype(str)
         for k in sorted(coh.unique()):

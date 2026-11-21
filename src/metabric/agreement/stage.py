@@ -154,7 +154,7 @@ def run_agreement(cfg: Config, run: Run, farm_runs: list[str], importance_run: s
         facts["loco"] = {"consensus": consensus, "worst_rank": float(ls.max().max()), "mean_rank": float(ls.mean().mean()),
                          "share_in_top10": float((loco[loco.consensus]["rank"] <= 10).mean())}
 
-    # --- ablation (section 9) ---------------------------------------------------------------------
+    # --- ablation (omics question) ---------------------------------------------------------------------
     auc = wi.pivot_table(index="split_id", columns="procedure", values="outer_auroc")
     steps = [tuple(s) for s in ac["ablation"]]
     ab = A.ablation(auc, steps, n_tr, n_te)
@@ -162,7 +162,7 @@ def run_agreement(cfg: Config, run: Run, farm_runs: list[str], importance_run: s
              "difference from the previous step")
     facts["ablation"] = ab.round(4).to_dict("records")
 
-    # --- cause-specific risk breakdown (F-058) -----------------------------------------------------
+    # --- cause-specific risk breakdown ----------------------------------------------------------
     cb = pd.DataFrame()
     cproc = ac["cause_procedure"]
     ww = wi[wi.procedure == cproc]

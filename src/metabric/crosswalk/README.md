@@ -15,7 +15,7 @@ The dataset's gene columns use lower-case symbols: RNA columns like `brca1`, mut
 1. **Normalise:** each dataset gene column becomes a symbol by upper-casing and removing `_mut` (`tp53_mut` → `TP53`).
 2. **Aliases:** applied to both sides. Every alias applied to a set member is logged, and nothing is ever guessed.
 3. **Match:** exact symbol equality only, with no partial-string matching. A gene measured in both blocks (168 of the 173 mutation genes also have an RNA column) gets one row per block.
-4. **Count per set:** matched RNA and DNA genes, with pass/fail on the minimum overlap. A set needs at least 5 matched RNA genes (`gene_sets.min_rna_overlap`, owner-confirmed) to be used for scores; sets below that stay in the tables for lookup.
+4. **Count per set:** matched RNA and DNA genes, with pass/fail on the minimum overlap. A set needs at least 5 matched RNA genes (`gene_sets.min_rna_overlap`) to be used for scores; sets below that stay in the tables for lookup.
 5. **Check coverage:** compares against `gene_sets.expected_coverage` and logs a warning on any difference.
 
 ## Outputs
@@ -48,7 +48,7 @@ Every answer names its source file.
 ## Rules
 
 - Annotation only: this stage never reads outcome labels.
-- A symbol mismatch is reported in `unmatched_genes.csv` and fixed only by an alias that the owner has approved.
+- A symbol mismatch is reported in `unmatched_genes.csv` and fixed only by an explicit alias in `symbol_aliases.csv`, never by guessing.
 
 ## Tests
 

@@ -80,12 +80,12 @@ class SurvivalModel:
         names = list(m.prep_.get_feature_names_out())
         raw = sorted(self.columns, key=len, reverse=True)
 
-        def owner(n):
+        def source_column(n):
             for c in raw:
                 if n == c or n.startswith(c + "_") or n == f"missingindicator_{c}":
                     return c
             return n
-        own = [owner(n) for n in names]
+        own = [source_column(n) for n in names]
         C = (Z - self.zbar) * m.m_.coef_
         return pd.DataFrame(C, columns=own, index=X.index).T.groupby(level=0).sum().T
 

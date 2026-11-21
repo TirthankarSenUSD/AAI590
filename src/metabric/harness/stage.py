@@ -57,7 +57,7 @@ def run_harness(cfg: Config, run: Run) -> dict:
     loco = H.loco(cands, ds.frame["cohort"])
     st.table("loco", loco, "Leave-one-cohort-out on the training rows (sensitivity only)")
     rf = H.regression_floor(res.folds)
-    st.table("regression_floor", rf, "Regression floor per floor model: mean - 2 SD of outer-fold AUROC (B5)")
+    st.table("regression_floor", rf, "Regression floor per floor model: mean - 2 SD of outer-fold AUROC")
     age = next(c for c in cands if c.name == "age_only")
     proc = lambda y: H.evaluate([age], y=y, light=True).folds.auroc.mean()  # noqa: E731
     perm, perm_s = H.permutation_test(proc, cfg["harness"]["n_permutations"], rng)

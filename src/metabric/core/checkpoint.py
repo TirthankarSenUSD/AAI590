@@ -48,8 +48,14 @@ def activate(outputs: Path, config_hash: str, command: str) -> Path:
 def deactivate(remove: bool) -> None:
     d = _ACTIVE["dir"]
     _ACTIVE.update(dir=None, calls={})
-    if remove and d is not None and d.exists():
-        shutil.rmtree(d, ignore_errors=True)
+    if remove and d is not None:
+        import time
+        for _ in range(10):                     # Windows can briefly lock new files (indexer, antivirus): retry
+            if not d.exists():
+                break
+            shutil.rmtree(d, ignore_errors=True)
+            if d.exists():
+                time.sleep(0.2)
 
 
 def active() -> bool:

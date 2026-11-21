@@ -1,4 +1,4 @@
-"""Harness tests on synthetic data, where the right answer is known (CLAUDE.md section 9, step 2)."""
+"""Harness tests on synthetic data, where the right answer is known."""
 import numpy as np
 import pandas as pd
 import pytest

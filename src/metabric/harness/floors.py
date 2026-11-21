@@ -1,4 +1,4 @@
-"""Design matrix and the floor models (CLAUDE.md section 5: always reported, never eligible to win)."""
+"""Design matrix and the floor models (always reported, never eligible to win)."""
 from __future__ import annotations
 
 import pandas as pd

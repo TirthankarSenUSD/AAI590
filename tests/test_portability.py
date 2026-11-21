@@ -1,4 +1,4 @@
-"""The code must work from a fresh copy of the folder placed elsewhere (B6)."""
+"""The code must work from a fresh copy of the folder placed elsewhere."""
 import shutil
 import subprocess
 import sys

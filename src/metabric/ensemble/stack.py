@@ -1,4 +1,4 @@
-"""Ensemble building blocks (PLAN.md section 7, steps 3-4). Every function here is fitted on the
+"""Ensemble building blocks (agreement merge, stacker, averages). Every function here is fitted on the
 outer training rows' inner out-of-fold member predictions only, then applied to the outer test rows.
 
 Options, simplest first: best_single < mean < weighted < stacker.

@@ -22,7 +22,7 @@ A reproducible machine-learning pipeline that predicts overall survival in breas
 | 7 | Report and patient output | done |
 | – | Final run (5 × 5 outer splits) and one-time holdout scoring | done |
 | P2 | Phase 2: survival analysis, patient survival output, one-time holdout scoring | done |
-| – | Pre-publication cleanup | next |
+| – | Pre-publication cleanup | done |
 
 ## Results
 
@@ -109,8 +109,6 @@ Each stage lives in its own folder under `src/metabric/`, with a `README.md` tha
 ├── data/                   METABRIC_RNA_Mutation.csv (read-only)
 ├── reference/              gene-set files; crosswalk/ is built from them
 ├── outputs/                run artifacts (created by the pipeline)
-├── PLAN.md                 design, requirements and decision log
-├── FINDINGS.md             build log of findings and decisions (append-only)
 └── RUNME.md                reproduction commands
 ```
 
@@ -147,7 +145,7 @@ python run.py phase2 --step checks                            # Phase 2: Kaplan-
 python run.py phase2 --step models                            # Phase 2: survival models through the nested CV
 python run.py phase2 --step final --models-run M              # Phase 2: final survival model and patient survival output
 python run.py phase2 --step holdout --final-run F             # ONCE ONLY: score the holdout for Phase 2
-python -m pytest -q              # run the test suite (113 tests, about 25 min)
+python -m pytest -q              # run the test suite (116 tests, about 25 min)
 ```
 
 The full final run (all arms, 5 × 5 outer splits) takes about 14 hours on 8 cores. Long runs resume from checkpoints when rerun with the same command. `RUNME.md` lists the exact order.
@@ -191,7 +189,7 @@ Baselines on the training rows (mean outer-fold AUROC, 95% CI):
 
 ## Selected EDA findings
 
-The descriptive EDA reproduces all 50 reference values. Highlights, with details in `FINDINGS.md`:
+The descriptive EDA reproduces all 50 reference values. Highlights:
 
 - **The label mixes causes and ignores time.** 43.5% of deaths are from causes other than breast cancer. 32% of survivors have under 10 years of follow-up.
 - **Clinical signal:**

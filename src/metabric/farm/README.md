@@ -102,7 +102,7 @@ The label `death_from_cancer` (alive / died of disease / died of other causes) i
 - **Why:** age mainly predicts other-cause death and tumour burden mainly predicts cancer death. Two cause-specific scores combine as "high risk through either route", which one additive score can only approximate.
 - **Fair comparison:** each cause member is compared with its binary counterpart on the same inputs (on C+RNA via `<arm>|<member>@cause_reps`).
 - **Permutation test:** it shuffles the full 3-class label.
-- **Result** (F-054): all six comparisons are positive, about +0.005 AUROC, two of them significant. The 1-SE rule still prefers the simpler binary logistic regression for the arm headline.
+- **Result:** all six comparisons are positive, about +0.005 AUROC, two of them significant. The 1-SE rule still prefers the simpler binary logistic regression for the arm headline.
 
 ## Selection and "simpler"
 

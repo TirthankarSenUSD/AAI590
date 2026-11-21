@@ -81,7 +81,7 @@ def test_npi_standard_formula_and_missing():
 
 
 def test_file_npi_uses_0_02_size_weight(ds):
-    """Guards FINDINGS F-021: the supplied NPI is 0.02 x size(cm) + node stage + grade."""
+    """Guards the data fact: the supplied NPI is 0.02 x size(cm) + node stage + grade."""
     from metabric.data import npi_standard
     f = ds.frame
     ns = npi_standard(f)

@@ -123,7 +123,14 @@ def _detail_task(key, cand, cols_top, Xtr, ytr, Xte, yte, split_id, s):
 
 def _parallel(fn, tasks, n_jobs, log, label):
     """Run `fn(*t)` for every task (t[0] is the task's key; results carry it as r["key"]).
-    Resumable: finished tasks are saved as they complete and skipped when the run is repeated."""
+    Resumable: finished tasks are saved as they complete and skipped when the run is repeated.
+    Results come back in task order, whatever order the workers finish in."""
+    res = _parallel_any_order(fn, tasks, n_jobs, log, label)
+    pos = {repr(t[0]): i for i, t in enumerate(tasks)}
+    return sorted(res, key=lambda r: pos[repr(r["key"])])
+
+
+def _parallel_any_order(fn, tasks, n_jobs, log, label):
     ck = checkpoint.Loop(f"parallel:{label}:{fn.__name__}")
     prog = _Progress(len(tasks), log, label)
     res, todo = [], []

@@ -2,7 +2,7 @@
 # Create:  conda create -n metabric-v2 python=3.14.3 pip -y
 #          conda activate metabric-v2
 #          pip install -r requirements.txt
-# torch comes from the PyTorch CPU wheel index (one OpenMP runtime; see FINDINGS F-027).
+# torch comes from the PyTorch CPU wheel index (one OpenMP runtime: conda's MKL numpy alongside pip's torch breaks the torch import).
 --extra-index-url https://download.pytorch.org/whl/cpu
 
 cloudpickle==3.1.2

@@ -36,7 +36,7 @@ outputs/<run_id>/                 run_id = <local timestamp>_<first 8 chars of t
   - `run.record_input(path, role)` records an input file (size, SHA-256).
   - `run.record_external(path, role)` records a generated file that lives outside the run folder, such as `reference/crosswalk/*.csv`.
 - **`run.finalize()`** validates the run: every listed file must exist, external files must still match their hash, and no file in the run folder may be unlisted. It then marks the run `complete` and points `outputs/latest.json` at it. A failed validation marks the run `invalid`; an exception marks it `failed`, and the folder is kept as a record.
-- **Windows file locks:** manifest writes retry, because Windows can briefly lock the file (FINDINGS F-019).
+- **Windows file locks:** manifest writes retry, because Windows can briefly lock the file (indexer, editor).
 
 ## Resumable runs (`checkpoint.py`)
 

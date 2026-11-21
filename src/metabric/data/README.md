@@ -31,7 +31,7 @@ The result is a `Dataset` with:
 - **`npi_standard(frame)`:** the standard Nottingham Prognostic Index, 0.2 × size(cm) + node stage + grade.
   - **Node stage:** 0 positive nodes → 1, 1–3 → 2, 4 or more → 3.
   - **Missing values:** the result is missing if any input is missing (89 patients).
-  - **Why both exist:** the file's own `nottingham_prognostic_index` uses a 0.02 size weight instead (FINDINGS F-021). Both are kept as floors: the file's version is primary, the standard one secondary (F-028).
+  - **Why both exist:** the file's own `nottingham_prognostic_index` uses a 0.02 size weight instead. Both are kept as floors: the file's version is primary, the standard one secondary.
 
 ## Tests
 

@@ -84,7 +84,7 @@ def threshold_for_sensitivity(y, p, target: float) -> float:
 
 def threshold_for_f1(y, p) -> float:
     """Threshold maximising F1 (death = positive). Fit on inner-fold predictions only; ties -> the
-    higher threshold. A secondary operating point, never the headline (A11)."""
+    higher threshold. A secondary operating point, never the headline."""
     y, p = np.asarray(y, int), np.asarray(p, float)
     order = np.argsort(-p, kind="mergesort")
     ys, ps = y[order], p[order]

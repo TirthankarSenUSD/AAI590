@@ -1,4 +1,4 @@
-"""Representation transformers for step 3c (PLAN.md section 3). All are fitted inside each
+"""Representation transformers for step 3c (RNA and DNA representations). All are fitted inside each
 training fold by the harness and none of them reads the outcome: they are unsupervised
 summaries of the RNA block or the DNA (mutation flag) block.
 

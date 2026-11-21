@@ -1,13 +1,13 @@
 """Deployment fit of the final model on all training rows (build step 7).
 
-The final model is a *procedure* (ensemble stage, F-060/F-063): on one arm, every member picks its
+The final model is a *procedure* (as chosen by the ensemble stage): on one arm, every member picks its
 own configuration by the inner-fold rule; members whose predictions correlate above
 `ensemble.merge_spearman` are merged (logit average weighted by AUROC - 0.5); the `best_single`
 option then keeps the best merged column (simplest within 1 SE). Here exactly that procedure is run
 once on all training rows, with `report.deploy_folds` stratified folds in the role of the inner
 folds. Nothing here reads the holdout.
 
-Primary probabilities follow the overfit gate (F-042): if the calibration slope of the deployment
+Primary probabilities follow the overfit gate: if the calibration slope of the deployment
 out-of-fold predictions is above `harness.overfit_gate.recalibrate_above_slope`, a Platt map fitted on
 those predictions is applied; otherwise raw probabilities are primary.
 """

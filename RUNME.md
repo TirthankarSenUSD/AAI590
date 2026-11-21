@@ -9,7 +9,7 @@ conda activate metabric-v2
 pip install -r requirements.txt     # exact pins; torch from the PyTorch CPU wheel index
 pip install --no-deps -r requirements-survival.txt   # Phase 2: scikit-survival without ecos (no Python 3.14 wheel; unused)
 ```
-Use the activated env. Do not mix in conda's numpy/MKL packages: that brings a second OpenMP runtime and torch fails to import (FINDINGS F-014, F-027).
+Use the activated env. Do not mix in conda's numpy/MKL packages: that brings a second OpenMP runtime and torch fails to import.
 
 ## Build steps done so far (1, 1a, 1b, 2, 3, 4)
 ```
@@ -31,9 +31,10 @@ python run.py phase2 --step models                       # Phase 2b: survival me
 python run.py phase2 --step final --models-run M         # Phase 2c: final survival model + patient survival output
 python run.py phase2 --step holdout --final-run F --dry-run   # shuffled outcomes; scores nothing
 python run.py phase2 --step holdout --final-run F        # ONCE ONLY: scores the holdout for Phase 2
-python -m pytest -q                 # 113 tests (about 25 min; includes small end-to-end farm, importance and ensemble runs)
+python run.py report-pack --runs-file outputs/final_runs.yaml [--findings LOG.md]   # figures + report_material.md (seconds)
+python -m pytest -q                 # 116 tests (about 25 min; includes small end-to-end farm, importance and ensemble runs)
 ```
-## Final run A1 (5x5 outer, 3 inner; about 14 h on 8 cores)
+## Full run (5x5 outer, 3 inner; about 14 h on 8 cores)
 Run in this order. Each line is one run; if one stops, rerun the same line (it resumes from its checkpoints).
 ```
 python run.py harness
@@ -55,5 +56,5 @@ python run.py report    --farm-runs <same list> --ensemble-run <ensemble id> --a
 - Each command creates `outputs/<timestamp>_<config hash>/` with `config.yaml`, `manifest.json` and `<stage>/{figures,tables,logs}`.
   `outputs/latest.json` names the newest completed run. Earlier runs are never overwritten.
 - EDA outputs: `outputs/<run>/eda/tables/{descriptive,modelling}__eda_summary.md` (generated summary),
-  `descriptive__reference_check.csv` (PLAN.md section 17 values), and one PNG + CSV per figure.
+  `descriptive__reference_check.csv` (the reference values in `config.yaml`), and one PNG + CSV per figure.
 - pytest writes its temporary files to `.pytest_tmp/` inside this folder (safe to delete).

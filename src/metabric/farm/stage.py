@@ -183,7 +183,7 @@ def run_farm(cfg: Config, run: Run, members=None, arms=None) -> dict:
     st.table("regression_floor", rf, "Regression floor per procedure: mean - 2 SD of outer-fold AUROC (provisional until the final model)")
 
     # The permutation test runs only in a farm run that includes the permutation arm. Runs split by arm
-    # must not each repeat it on their own first arm (F-072): it is one test of the pipeline, not per arm.
+    # must not each repeat it on their own first arm: it is one test of the pipeline, not per arm.
     perm_arm = cfg["farm"].get("permutation_arm", "C")
     perm_s = None
     if f"{perm_arm}|best" in procs:

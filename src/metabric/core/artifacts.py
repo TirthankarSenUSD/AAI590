@@ -1,9 +1,9 @@
-"""Artifact writer and manifest (PLAN.md section 18).
+"""Artifact writer and manifest.
 
 Layout: outputs/<run_id>/<stage>/{figures,tables,logs}/ plus config.yaml and manifest.json
 in the run folder. A run is complete only when its manifest validates: every listed file
 exists and no file in the run folder is unlisted. outputs/latest.json points at the newest
-completed run (a pointer file, not a symlink: see FINDINGS).
+completed run (a pointer file, not a symlink, so it works on Windows without special rights).
 """
 from __future__ import annotations
 

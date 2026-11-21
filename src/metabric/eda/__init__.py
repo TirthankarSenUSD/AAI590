@@ -1,4 +1,4 @@
-"""Rerunnable EDA stage (PLAN.md section 17).
+"""Rerunnable EDA stage.
 
 Modes:
   descriptive - all 1,904 patients; for the report only, never for modelling choices.
@@ -231,7 +231,7 @@ def reference_check(ctx: Ctx) -> pd.DataFrame:
         ok = obs is not None and abs(float(obs) - float(r["expected"])) <= float(r["tol"]) + 1e-9
         rows.append({"key": r["key"], "expected": r["expected"], "observed": obs, "tolerance": r["tol"], "match": bool(ok)})
     rc = pd.DataFrame(rows)
-    ctx.table("reference_check", rc, "Reference values (PLAN.md section 17) against this run")
+    ctx.table("reference_check", rc, "Reference values (config) against this run")
     bad = rc[~rc.match]
     ctx.facts["n_reference_values"] = len(rc)
     ctx.facts["n_reference_mismatch"] = len(bad)
@@ -255,7 +255,7 @@ def summary(ctx: Ctx, run: Run) -> str:
          f"Run `{run.run_id}`, config hash `{ctx.cfg.hash}`, seed {ctx.cfg.seed}. {n:,} patients. "
          "Every number below is computed in this run; wording is chosen by rule from the numbers.", ""]
     if ctx.mode == "descriptive":
-        L += ["> Full cohort, descriptive only. Nothing here may inform a modelling choice (A13).", ""]
+        L += ["> Full cohort, descriptive only. Nothing here may inform a modelling choice.", ""]
     else:
         L += ["> Training rows only (frozen holdout excluded). This is the only EDA allowed to inform modelling choices.", ""]
     L += ["## Outcome",
@@ -326,7 +326,7 @@ def summary(ctx: Ctx, run: Run) -> str:
         L += ["## Reference check", (f"- All {tot} reference values match." if k == 0 else
               f"- {k} of {tot} reference values differ: " + "; ".join(
                   f"`{m['key']}` expected {m['expected']}, observed {m['observed']}" for m in F["reference_mismatches"])
-              + ". Each is investigated in FINDINGS.md."), ""]
+              + ". Each must be investigated before modelling."), ""]
     else:
         L += ["## Split balance",
               f"- {F['n_train']} training and {F['n_holdout']} holdout patients. Largest difference on a stratified variable: "

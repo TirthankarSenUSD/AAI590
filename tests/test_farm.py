@@ -63,8 +63,8 @@ def test_linear_preprocessing_is_one_hot_and_fitted_on_training_rows_only(cfg, d
     Z = pre.transform(f.iloc[800:])
     assert not np.isnan(Z).any()
     names = list(pre.get_feature_names_out())
-    assert any(n.startswith("cohort_") for n in names)                  # one-hot, not an integer code (A1)
-    assert any("missingindicator" in n for n in names)                  # missing flags kept (A12)
+    assert any(n.startswith("cohort_") for n in names)                  # one-hot, not an integer code
+    assert any("missingindicator" in n for n in names)                  # missing flags kept
     med = ds.frame["tumor_size"].iloc[:800].median()
     num = pre.named_transformers_["num"].named_steps["simpleimputer"]
     assert num.statistics_[g["numeric"].index("tumor_size")] == pytest.approx(med)   # learned from training rows
@@ -125,7 +125,7 @@ def test_run_farm_end_to_end_small(tmp_project):
 
 
 def test_farm_run_without_the_permutation_arm_skips_the_permutation_test(tmp_project):
-    """Farm runs split by arm: only the run holding the permutation arm runs the test (F-072)."""
+    """Farm runs split by arm: only the run holding the permutation arm runs the test."""
     from metabric.core.artifacts import Run
     from metabric.data import load_dataset
     from metabric.farm.stage import run_farm

@@ -1,6 +1,6 @@
 """Phase 2 survival members. Every member has `fit(X, time, event)` and `survival(X, times)`
 (the predicted probability of surviving past each time, one row per patient). All preprocessing is
-fitted on the training rows passed to `fit` (A12).
+fitted on the training rows passed to `fit`.
 
 - `RidgeCox`: Cox proportional hazards with a ridge penalty, Breslow ties and optional strata
   (scikit-survival has no stratified Cox). Baseline hazard per stratum (Breslow).

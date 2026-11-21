@@ -75,7 +75,7 @@ Output names carry the mode as a prefix (`descriptive__…`, `modelling__…`), 
   - balance of the holdout against the training rows;
   - `_fold_balance`, the balance of every frozen outer split (test part against training part), with an SMD heatmap;
   - stratified variables fail above a 2-point difference; others warn above |SMD| 0.10.
-- **`reference_check` (descriptive only):** compares 50 computed numbers with the reference values in `config.yaml` (from PLAN.md section 17), within their tolerances. Any mismatch is logged and must be investigated.
+- **`reference_check` (descriptive only):** compares 50 computed numbers with the reference values in `config.yaml` (known facts about the file), within their tolerances. Any mismatch is logged and must be investigated.
 - **`summary` (item 11):** writes `<mode>__eda_summary.md`. Every sentence is computed from the numbers and the wording is chosen by rule; nothing is typed by hand.
 - **`facts` table:** every key number of the run.
 

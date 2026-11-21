@@ -196,7 +196,7 @@ def run_ensemble(cfg: Config, run: Run, farm_runs: list[str]) -> dict:
     st.table("paired_comparisons", pairs, "Paired AUROC differences (corrected resampled t): options vs best single member; arms vs the baseline arm")
 
     final = _final(F, summ, pairs, arms, ec, n_tr, n_te)
-    st.table("final_model", pd.DataFrame([final]), "Final model by the fixed rules (owner, F-055; PLAN section 7 step 4) and its regression floor")
+    st.table("final_model", pd.DataFrame([final]), "Final model by the fixed rules (arm, then option) and its regression floor")
     _figures(st, summ, pd.DataFrame(weights), dv, arms)
     facts = {"final": final, "farm_runs": farm_runs, "arms": arms, "seconds": round(time.time() - t0),
              "choice": pd.DataFrame(chosen).groupby("arm").option.value_counts().to_dict()}

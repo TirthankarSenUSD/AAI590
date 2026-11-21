@@ -31,7 +31,7 @@ def cmd_crosswalk(args) -> str:
             st.table(f"snapshot_{name}", df, f"Snapshot of reference/crosswalk/{name}.csv as built by this run")
         st.table("coverage", res.coverage, "Gene-set coverage of the 489 RNA and 173 DNA columns per source")
         chk = check_coverage(res.coverage, cfg)
-        st.table("coverage_check", chk, "Observed coverage against the expected values in CLAUDE.md 3b")
+        st.table("coverage_check", chk, "Observed coverage against the expected values in config")
         st.table("alias_log", res.alias_log, "Aliases applied to gene-set symbols (from symbol_aliases.csv)")
         st.log.info("coverage:\n%s", res.coverage.to_string(index=False))
         bad = chk[~chk.match]
@@ -221,6 +221,19 @@ def cmd_score_holdout(args) -> str:
     return run.run_id
 
 
+def cmd_report_pack(args) -> str:
+    from .report.pack import run_pack
+    cfg = load_config()
+    run = Run(cfg, f"report-pack --runs-file {args.runs_file}" + (f" --findings {args.findings}" if args.findings else ""))
+    try:
+        run_pack(cfg, run, args.runs_file, args.findings)
+        run.finalize()
+    except BaseException as exc:
+        run.fail(exc)
+        raise
+    return run.run_id
+
+
 def cmd_eda(args) -> str:
     from .eda import run_eda
     cfg = load_config()
@@ -271,12 +284,16 @@ def main(argv=None) -> int:
     sh = sub.add_parser("score-holdout", help="score the frozen holdout ONCE with the saved final model (last step of Phase 1)")
     sh.add_argument("--report-run", required=True, help="report run whose models/final_model.joblib is scored")
     sh.add_argument("--dry-run", action="store_true", help="shuffle the holdout labels: check the code path, score nothing")
+    rpk = sub.add_parser("report-pack", help="collect figures, summaries and key results of the final runs for the written report")
+    rpk.add_argument("--runs-file", required=True, help="YAML naming the final run of each stage (see RUNME.md)")
+    rpk.add_argument("--findings", help="optional: a findings log (entries headed '### <id> · <date> · <topic> · <title>') "
+                                        "added as an appendix")
     e = sub.add_parser("eda", help="rerunnable EDA stage")
     e.add_argument("--mode", choices=["descriptive", "modelling", "both"], default="both")
     args = p.parse_args(argv)
     rid = {"crosswalk": cmd_crosswalk, "holdout": cmd_holdout, "splits": cmd_splits, "harness": cmd_harness,
            "farm": cmd_farm, "importance": cmd_importance, "ensemble": cmd_ensemble, "agreement": cmd_agreement, "report": cmd_report,
-           "score-holdout": cmd_score_holdout, "phase2": cmd_phase2, "eda": cmd_eda}[args.cmd](args)
+           "score-holdout": cmd_score_holdout, "phase2": cmd_phase2, "report-pack": cmd_report_pack, "eda": cmd_eda}[args.cmd](args)
     print(f"run complete: outputs/{rid}")
     return 0
 

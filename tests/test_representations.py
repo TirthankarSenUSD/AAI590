@@ -80,3 +80,16 @@ def test_representation_preprocessing_fits_on_fitting_rows_only(cfg, ds, arm, rn
     b = preprocessor(g, "linear", rr, cfg, 0, None, dr).fit(X2.iloc[:800]).transform(X.iloc[800:])
     np.testing.assert_allclose(a, b)                                         # fit never saw rows 800+
     assert np.isfinite(a).all()
+
+
+def test_frequency_selector_ignores_global_random_state():
+    """liblinear is randomised: the selector must seed it, or reruns pick different genes."""
+    from metabric.farm.preprocess import FrequencySelector
+    rng = np.random.default_rng(0)
+    X = rng.normal(size=(300, 40))
+    y = (X[:, :8].sum(axis=1) + rng.normal(size=300) > 0).astype(int)
+    picks = []
+    for s in (1, 2, 3):
+        np.random.seed(s)                                              # perturb the global generator
+        picks.append(tuple(FrequencySelector(k=10, n_subsamples=5, random_state=7).fit(X, y).selected_))
+    assert len(set(picks)) == 1

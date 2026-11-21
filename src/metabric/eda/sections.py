@@ -1,4 +1,4 @@
-"""EDA sections 1-9 (PLAN.md section 17). Each writes tables/figures through ctx and records
+"""EDA sections 1-9. Each writes tables/figures through ctx and records
 key numbers in ctx.facts (used by the reference check and the generated summary)."""
 from __future__ import annotations
 
@@ -418,9 +418,9 @@ def redundancy(ctx) -> None:
     corr = plain.copy()
     for i, a in enumerate(cat):
         for b in cat[i:]:
-            v1 = 1.0 if a == b else st.cramers_v(cf[a], cf[b])
+            vp = 1.0 if a == b else st.cramers_v(cf[a], cf[b])
             v2 = 1.0 if a == b else st.cramers_v(cf[a], cf[b], bias_corrected=True)
-            plain.loc[a, b] = plain.loc[b, a] = v1
+            plain.loc[a, b] = plain.loc[b, a] = vp
             corr.loc[a, b] = corr.loc[b, a] = v2
     ctx.table("redundancy_cramers_v_plain", plain.rename_axis("variable").reset_index(), "Cramer's V (plain) between categorical clinical columns")
     ctx.table("redundancy_cramers_v_corrected", corr.rename_axis("variable").reset_index(), "Cramer's V (bias-corrected, Bergsma) between categorical clinical columns")
@@ -461,7 +461,7 @@ def redundancy(ctx) -> None:
     d = f[["tumor_size", "lymph_nodes_examined_positive", "neoplasm_histologic_grade", npi]].dropna()
     node_stage = np.select([d.lymph_nodes_examined_positive == 0, d.lymph_nodes_examined_positive <= 3], [1, 2], 3)
     base = node_stage + d.neoplasm_histologic_grade
-    formulas = {"standard": (0.2, "0.2 x size(cm) + node stage (0:1, 1-3:2, 4+:3) + grade  [CLAUDE.md 3]"),
+    formulas = {"standard": (0.2, "0.2 x size(cm) + node stage (0:1, 1-3:2, 4+:3) + grade"),
                 "file_fit": (0.02, "0.02 x size(cm) + node stage + grade  [what the file matches]")}
     recs, npi_rows = {}, []
     for key, (coef, text) in formulas.items():
@@ -490,7 +490,7 @@ def redundancy(ctx) -> None:
     ctx.figure("redundancy_npi_reconstruction", fig,
                pd.DataFrame({"standard_0.2": recs["standard"], "file_fit_0.02": recs["file_fit"], "file": d[npi]}),
                "NPI in the file against the standard formula (0.2 x size cm) and a 0.02 size weight; dashed = identity")
-    # the two NPI floors (F-028): file NPI (primary) and standard NPI (secondary), descriptive AUROCs
+    # the two NPI floors: file NPI (primary) and standard NPI (secondary), descriptive AUROCs
     from ..data import npi_standard
     ns = npi_standard(f)
     assert np.allclose(ns.loc[d.index], recs["standard"]), "npi_standard disagrees with the EDA reconstruction"

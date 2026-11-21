@@ -67,7 +67,7 @@ It records the winner, its outer score and the optimism. The headline of later s
 | `npi_file` | Logistic regression on the NPI as supplied (size weight 0.02 per cm). |
 | `npi_standard` | Logistic regression on the standard NPI, with an in-fold median fill and a missing flag. |
 
-Results on the training rows: age-only 0.685 is the bar to beat (FINDINGS F-033).
+Results on the training rows: age-only 0.685 is the bar to beat.
 
 ## Settings
 

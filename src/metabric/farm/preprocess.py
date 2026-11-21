@@ -15,7 +15,7 @@ from sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEnc
 
 class CategoricalAsString(BaseEstimator, TransformerMixin):
     """Stateless: categorical columns as strings, missing as its own level 'missing' (keeps the
-    missingness signal for linear models, A12)."""
+    missingness signal for linear models)."""
 
     def fit(self, X, y=None):
         return self
@@ -31,7 +31,7 @@ class CategoricalAsString(BaseEstimator, TransformerMixin):
 class FrequencySelector(BaseEstimator, TransformerMixin):
     """Top-k genes by selection frequency: L1 logistic regression on `n_subsamples` stratified
     half-samples of the training rows; genes ranked by how often their coefficient is non-zero
-    (ties: mean |coefficient|). Fitted inside the fold only (A7)."""
+    (ties: mean |coefficient|). Fitted inside the fold only."""
 
     def __init__(self, k=30, n_subsamples=10, fraction=0.5, C=0.05, random_state=0):
         self.k, self.n_subsamples, self.fraction, self.C, self.random_state = k, n_subsamples, fraction, C, random_state
@@ -46,7 +46,8 @@ class FrequencySelector(BaseEstimator, TransformerMixin):
         for _ in range(self.n_subsamples):
             idx = np.concatenate([rng.choice(np.flatnonzero(y == v), int(round(self.fraction * (y == v).sum())), replace=False)
                                   for v in (0, 1)])
-            m = LogisticRegression(l1_ratio=1.0, C=self.C, solver="liblinear", max_iter=1000).fit(Xs[idx], y[idx])
+            m = LogisticRegression(l1_ratio=1.0, C=self.C, solver="liblinear", max_iter=1000,
+                                   random_state=self.random_state).fit(Xs[idx], y[idx])   # liblinear is random: seed it
             coef = np.abs(m.coef_[0])
             freq += coef > 0
             mag += coef
@@ -160,7 +161,7 @@ def dna_transformer(rep: dict, kind: str, cfg):
 
 def preprocessor(groups: dict, kind: str, rep: dict | None, cfg, seed: int, rna_scale: float | None = None,
                  dna_rep: dict | None = None):
-    """kind 'linear': median fill + missing flags + scaling, one-hot categories (A1, A12).
+    """kind 'linear': median fill + missing flags + scaling, one-hot categories (never integer codes in a linear model).
     kind 'tree': numbers passed with gaps (native handling), categories as ordinal codes.
     kind 'embed': as 'linear' for numbers and RNA, but categories as integer codes placed last
     (for learned embeddings; 0 = a level never seen in the fitting rows)."""

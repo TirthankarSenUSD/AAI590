@@ -1,4 +1,4 @@
-"""Agreement analysis (build step 6; PLAN.md sections 8 and 9). Pure functions on tables written by
+"""Agreement analysis (build step 6). Pure functions on tables written by
 earlier stages: per-patient out-of-fold predictions (farm), permutation importance (importance).
 All predictions used here are outer-fold predictions, so nothing is scored on rows a model saw.
 """
@@ -61,7 +61,7 @@ def prediction_correlation(preds: pd.DataFrame, procedures: list[str]) -> pd.Dat
     return pd.DataFrame(rows)
 
 
-# ------------------------------------------------------------------ patients (item 6; F-058)
+# ------------------------------------------------------------------ patients
 def disagreement(preds: pd.DataFrame, procedures: list[str], n_boot: int, rng: np.random.Generator) -> tuple[pd.DataFrame, dict]:
     """Per patient and split: spread of the members' logits (SD) and the error of their mean
     prediction. The question is whether disagreement predicts error *beyond* what the predicted
@@ -105,7 +105,7 @@ def robustness(preds: pd.DataFrame, procedures: list[str], combined: dict[str, l
                          "p90_abs_change": diff.quantile(0.9).to_numpy()}).sort_values("mean_abs_change")
 
 
-# ------------------------------------------------------------------ the omics question (section 9)
+# ------------------------------------------------------------------ the omics question (ablation)
 def ablation(auc: pd.DataFrame, steps: list[tuple[str, str | None]], n_train: float, n_test: float) -> pd.DataFrame:
     """auc: rows split_id, columns procedure, values outer AUROC on identical splits. `steps`:
     (procedure, baseline or None); each procedure's AUROC with a corrected 95% CI, and its paired

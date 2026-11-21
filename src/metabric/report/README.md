@@ -107,3 +107,26 @@ python run.py score-holdout --report-run R --dry-run  # same steps with the hold
 - the scoring recovers a good model and ranks it above weak floors;
 - the report text follows the results and labels a dry run;
 - the marker refuses a second scoring.
+
+## Report pack (`report-pack`)
+
+**Command:**
+```
+python run.py report-pack --runs-file outputs/final_runs.yaml [--findings LOG.md]
+```
+`final_runs.yaml` names the final run of each stage: eda_descriptive, eda_modelling, harness, farm_main, importance, ensemble, agreement, report, holdout, phase2_checks, phase2_models, phase2_final, phase2_holdout, and optionally farm_all.
+
+**What it does** (reads only saved results; nothing is refitted or rescored):
+- Copies every figure of those runs into `outputs/<run>/report/figures/`, numbered globally (`F01_...` to `Fnn_...`), each with its data CSV and its caption.
+- Draws the two Phase 2 holdout figures (risk-group Kaplan-Meier, calibration by decile) from the saved holdout predictions.
+- Writes `report_material.md`:
+  - provenance of every run;
+  - the study design, taken from the config;
+  - key results, taken from the result tables;
+  - for each section, its purpose, its figures and its generated summary, unchanged;
+  - the limitations as stated in each report;
+  - a figure index and a reproduction note.
+- Also writes `figure_index.csv` and `table_index.csv`.
+- With `--findings`, appends a findings and decisions log (entries headed `### <id> · <date> · <topic> · <title>`) as an appendix: entries by topic, an index table, and every entry in full.
+
+**Tests:** `tests/test_report.py::test_report_pack_helpers`, `test_findings_appendix_indexes_and_keeps_every_entry`.

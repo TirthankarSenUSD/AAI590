@@ -108,3 +108,20 @@ def test_every_member_pipeline_can_be_saved(cfg):
             seen.add(meta[c.name].member)
             pickle.dumps(c.make())
     assert {"logreg_en", "mlp_embed", "multimodal"} <= seen
+
+
+def test_report_pack_helpers():
+    from metabric.report.pack import SECTIONS, _demote
+    assert _demote("# A\ntext\n## B", 2) == "### A\ntext\n#### B"
+    keys = [s[0] for s in SECTIONS]
+    assert len(keys) == len(set(keys)) and len({s[2] for s in SECTIONS}) == len(SECTIONS)
+
+
+def test_findings_appendix_indexes_and_keeps_every_entry():
+    from metabric.report.pack import findings_appendix
+    log = "# Log\n\nintro\n\n### X-001 · 2026-01-01 · data · First\nBody one.\n**Status:** done.\n\n### X-002 · 2026-01-02 · design · Second\n#### sub\nBody two.\n"
+    L = findings_appendix(log)
+    s = "\n".join(L)
+    assert "| X-001 | 2026-01-01 | data | First |" in s and "| X-002 | 2026-01-02 | design | Second |" in s
+    assert "Body one." in s and "Body two." in s and "##### sub" in s           # nested headings pushed down
+    assert "**data** (1): X-001" in s and findings_appendix("no entries") == []

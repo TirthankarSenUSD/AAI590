@@ -1,6 +1,6 @@
 """Gene crosswalk (build step 1a): dataset gene columns <-> gene-set files in reference/.
 
-Rules (CLAUDE.md section 3b): only the gene-set files named in config; upper-case and strip
+Rules: only the gene-set files named in config; upper-case and strip
 `_mut`; exact symbol matching only (no partial strings); a gene measured in both blocks gets
 one row per block; aliases come only from the hand-maintained symbol_aliases.csv and every
 applied alias is reported. Annotation only: outcome labels are never read here.

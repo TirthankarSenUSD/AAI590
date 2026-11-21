@@ -1,7 +1,7 @@
 """Data layer: read, validate (fail loudly), clean, build the target and the feature blocks.
 
 Nothing here is fitted to the data. Missing indicators take an explicit column list; which
-columns get indicators must be decided on training rows only (A12, A13).
+columns get indicators must be decided on training rows only.
 """
 from __future__ import annotations
 
@@ -65,7 +65,7 @@ def validate_raw(df: pd.DataFrame, cfg: Config) -> dict:
             problems.append("RNA block contains non-float columns")
         if rna.isna().any().any():
             problems.append("RNA block has missing values")
-        # z-score heuristic: consistency check only (A10)
+        # z-score heuristic: consistency check only
         m, s = rna.mean().abs().max(), rna.std()
         if m > 0.05 or (s - 1).abs().max() > 0.05:
             problems.append(f"RNA block fails the z-score check (max |mean| {m:.3f}, SD range {s.min():.3f}-{s.max():.3f})")
@@ -118,8 +118,8 @@ def npi_standard(frame: pd.DataFrame) -> pd.Series:
 
     Node stage: 0 positive nodes -> 1, 1-3 -> 2, 4 or more -> 3. `tumor_size` is in mm.
     Missing if any input is missing. Deterministic (nothing fitted). The file's own
-    `nottingham_prognostic_index` uses a 0.02 size weight instead (FINDINGS F-021); both are
-    kept: the file's NPI is the primary floor, this one the secondary floor (F-028).
+    `nottingham_prognostic_index` uses a 0.02 size weight instead; both are
+    kept: the file's NPI is the primary floor, this one the secondary floor.
     """
     nodes = frame["lymph_nodes_examined_positive"]
     node_stage = pd.Series(np.select([nodes == 0, nodes <= 3], [1.0, 2.0], 3.0), index=frame.index)

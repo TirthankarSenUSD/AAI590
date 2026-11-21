@@ -13,7 +13,7 @@ paths:
   holdout: outputs/frozen/holdout.csv
   holdout_scored: outputs/frozen/holdout_scored.json   # one-time marker: the holdout is scored once, never again
   phase2_holdout_scored: outputs/frozen/phase2_holdout_scored.json   # same, for the Phase 2 survival model
-  cv_splits: outputs/frozen/cv_splits_5x5.csv   # final run (F-068); the 5x2 file cv_splits.csv is kept for the earlier runs
+  cv_splits: outputs/frozen/cv_splits_5x5.csv   # 5 outer folds x 5 repeats; the earlier 5x2 file cv_splits.csv is kept
 
 target:
   source_column: overall_survival   # file: 1 = alive, 0 = died
@@ -25,19 +25,19 @@ holdout:
   min_stratum_count: 2              # strata smaller than this are merged (logged)
   sha256: "0fe1e9e49bcaa84977c82227245b94c264dbb57e6c039c6da7573894ed8e220c"                      # filled once when the holdout is created; verified on every run
 
-# Low compute budget (CLAUDE.md section 6). Used from build step 2 onward.
+# Nested cross-validation on the training rows (frozen splits). Raise these for a larger run without code changes.
 cv:
   outer_folds: 5
-  outer_repeats: 5                  # final run A1 (F-068); was 2 (sha e4707dfe..., outputs/frozen/cv_splits.csv)
+  outer_repeats: 5                  # 5 repeats (the earlier 2-repeat file is outputs/frozen/cv_splits.csv)
   inner_folds: 3
   first_arms: [C, C+RNA, strict_clinical]
   # seeds derived from `seed`: outer repeat r -> seed + r; inner split of (r, k) -> seed + 1000 * (r + 1) + k
   splits_sha256: "6388036cd6b9d1aff81822a97fb2f8fe79af4a77938b4edf5a59a9a1a74dea57"            # filled once when the CV splits are created; verified on every run
 
-# Evaluation harness (CLAUDE.md section 7, PLAN.md section 6). Thresholds fixed before any real run.
+# Evaluation harness. Thresholds fixed before any real run.
 harness:
   operating_point_sensitivity: 0.80 # threshold fixed on inner-fold predictions, applied to the outer fold
-  f1_operating_point: true          # secondary operating point: F1-maximising threshold on inner folds (owner, F-055)
+  f1_operating_point: true          # secondary operating point: F1-maximising threshold on inner folds
   recalibration: platt              # fitted on inner out-of-fold predictions, inside the outer fold
   reliability_bins: 10              # quantile bins
   n_boot: 200                       # bootstrap resamples for subgroup intervals
@@ -45,22 +45,22 @@ harness:
   chance_band: 0.03                 # permuted-label mean AUROC must lie within 0.5 +/- this
   select_within_se: 1.0             # simpler candidate wins within this many SE of the best inner AUROC
   learning_curve_fractions: [0.25, 0.5, 0.75, 1.0]
-  overfit_gate:                     # limits fixed before running (F-031, F-035); action revised by owner (F-042)
+  overfit_gate:                     # limits fixed before running; failing the slope limit makes recalibrated probabilities primary
     max_train_cv_auroc_gap: 0.05    # gap above this = overfitting flag
     min_calibration_slope: 0.8      # slope below this (over-confident) = overfitting flag
     recalibrate_above_slope: 1.2    # slope above this (under-confident) = needs recalibration: recalibrated probabilities are primary
     action: report                  # flags are reported; they never exclude a configuration from selection
   subgroups: [chemotherapy, hormone_therapy, radio_therapy, type_of_breast_surgery, chemo_x_hormone]
-  regression_floor_sd: 2            # regression floor = mean - 2 SD of outer-fold AUROC (B5)
+  regression_floor_sd: 2            # regression floor = mean - 2 SD of outer-fold AUROC
 
 # Model farm (step 3). Small grids for the first pass; raise later without code changes.
 farm:
   n_jobs: auto                      # auto = logical cores - 1 (at least 1); or an integer
   members: [logreg_en, svm_rbf, random_forest, xgboost, mlp, mlp_embed, multimodal]   # 3a classical + 3b neural
-  n_permutations: 10                # permutation test of the full <permutation_arm>|best procedure (F-043, F-046, F-053)
-  permutation_arm: C                # cause-specific pass: the C arm exercises the new cause label (F-053)
+  n_permutations: 10                # permutation test of the full <permutation_arm>|best procedure (label shuffles)
+  permutation_arm: C                # the test runs once, in the farm run that holds this arm
   arms:                             # rna_reps / dna_reps default to every representation; neural: false defers the
-                                    # neural members on that arm to final testing (F-046)
+                                    # neural members on that arm
     C: {blocks: [clinical]}
     C+RNA: {blocks: [clinical, rna], rna_reps: [all, top15, top30, top50, pca10, pca30, hallmark, reactome, modules, dae8, dae32]}
     strict_clinical: {blocks: [clinical], drop: [molecular_derived]}
@@ -69,9 +69,9 @@ farm:
     RNA: {blocks: [rna], rna_reps: [all, top30, pca10, hallmark, modules, dae8], neural: false}
     RNA+DNA: {blocks: [rna, dna], rna_reps: [pca10, hallmark], dna_reps: [flags, known5, pathway], neural: false}
     DNA: {blocks: [dna], dna_reps: [flags, known5, count, pathway, bagemb], neural: false}
-    fused: {blocks: [clinical, rna, dna], rna_reps: [top15], dna_reps: [known5], neural: false}   # step 5 fused arm (F-057)
-    C_diag: {blocks: [clinical], drop: [treatment]}   # at diagnosis: clinical without treatment columns (ablation step 1; F-059)
-  # one column per concept (F-039): oncotree_code == cancer_type_detailed, which
+    fused: {blocks: [clinical, rna, dna], rna_reps: [top15], dna_reps: [known5], neural: false}   # fused arm: clinical + top genes + known driver mutations
+    C_diag: {blocks: [clinical], drop: [treatment]}   # at diagnosis: clinical without treatment columns (first ablation step)
+  # one column per concept: oncotree_code == cancer_type_detailed, which
   # tumor_other_histologic_subtype determines; cancer_type has one sarcoma; NPI is a composite of
   # size, nodes and grade (floor only)
   drop_clinical: [oncotree_code, cancer_type_detailed, cancer_type, nottingham_prognostic_index]
@@ -128,13 +128,13 @@ farm:
 # Gates and importance (step 4). Explains the winners a farm run chose inside each outer fold: each is refitted
 # on its outer training rows (identical to the farm fit) and explained on the outer test rows only.
 importance:
-  arms_full: [C, C+RNA, strict_clinical]      # every member procedure + the best-member procedure (owner, F-050)
+  arms_full: [C, C+RNA, strict_clinical]      # every member procedure + the best-member procedure
   arms_modality_only: [C+RNA+DNA]             # grouped (modality) permutation importance only
-  shap_members: [logreg_en, random_forest, xgboost]   # exact SHAP only (linear, TreeSHAP); others permutation only (F-049)
+  shap_members: [logreg_en, random_forest, xgboost]   # exact SHAP only (linear, TreeSHAP); others permutation only
   n_repeats: 5                      # permutation repeats per feature group
   gene_groups: {distance_cut: 0.5, min_size: 2}       # correlated genes permuted together (modules on outer-train rows)
-  top_n: 10                         # features for partial dependence, ICE and interactions (owner-accepted proposal)
-  interaction_method: friedman_h    # pairwise H-statistic, model-agnostic (owner-accepted recommendation)
+  top_n: 10                         # features for partial dependence, ICE and interactions
+  interaction_method: friedman_h    # pairwise H-statistic, model-agnostic
   pdp_grid: 10                      # quantile grid points for numeric features
   ice_rows: 50                      # patients drawn for ICE curves (split r0o0)
   h_rows: 60                        # held-out patients per split for the H-statistic
@@ -143,12 +143,12 @@ importance:
 # Fusion and ensemble (step 5). Member winners come from farm runs; everything is redone inside every outer fold.
 ensemble:
   arms: [C, C+RNA, C+RNA+DNA, strict_clinical, fused, late_fusion]
-  late_fusion: [C|best, RNA|best, DNA|best]   # late fusion: one model per data type, combined like members (F-061)
+  late_fusion: [C|best, RNA|best, DNA|best]   # late fusion: one model per data type, combined like members
   members: [logreg_en, svm_rbf, random_forest, xgboost, mlp, mlp_embed, multimodal, logreg_cause, xgboost_cause]
   merge_spearman: 0.95              # members with more similar predictions are merged, weighted by (AUROC - 0.5)
   stacker_l2: 1.0                   # L2 penalty of the non-negative stacker (on member logits)
   option_cv_folds: 3                # second-level CV on the inner out-of-fold predictions to choose the option
-  cross_arm_baseline: C             # final arm: C unless another arm is significantly better (owner, F-055)
+  cross_arm_baseline: C             # final arm: C unless another arm is significantly better
   significance: 0.05
 
 # Model agreement (step 6). Reads farm and importance runs; adds two small refit analyses.
@@ -161,7 +161,7 @@ agreement:
   loco_members: [logreg_en, random_forest, xgboost, mlp]
   consensus_k: 5
   n_repeats: 5
-  cause_procedure: C|logreg_cause   # cause-specific risk breakdown (F-058)
+  cause_procedure: C|logreg_cause   # cause-specific risk breakdown
   ablation:                         # (procedure, baseline): clinical at diagnosis -> + treatment -> + DNA -> + RNA -> + both
     - [C_diag|best, null]
     - [C|best, C_diag|best]
@@ -178,14 +178,14 @@ report:
   n_background: 100                 # training patients used as the Shapley background
   n_permutations: 20                # Shapley permutations per patient (antithetic pairs)
   top_k: 5                          # contributing factors listed per data type
-  context_column: "pam50_+_claudin-low_subtype"   # cohort-context group (owner, 2026-11-19: PAM50 subtype only)
+  context_column: "pam50_+_claudin-low_subtype"   # cohort-context group: the clinical PAM50 subtype column
   small_group: 30                   # groups with fewer training patients are flagged as small
   risk_quantiles: [0.25, 0.5, 0.75] # risk-group cutpoints: quantiles of the training out-of-fold risk
   risk_labels: [low, below average, above average, high]
   cause_member: logreg_cause        # cause-specific member for the cause breakdown
   example_quantiles: [0.05, 0.25, 0.5, 0.75, 0.95]   # example records: patients at these quantiles of risk
 
-# Phase 2: survival analysis (overall survival; same holdout and frozen CV splits; F-077).
+# Phase 2: survival analysis (overall survival; same holdout and frozen CV splits).
 phase2:
   time_column: overall_survival_months
   zero_time_rule: half_min_positive   # the one patient with time 0 (censored) gets half the smallest positive time
@@ -209,11 +209,11 @@ phase2:
     cox_age:      {kind: simple_cox, fixed: {columns: [age_at_diagnosis]}}
     cox_npi:      {kind: simple_cox, fixed: {columns: [nottingham_prognostic_index]}}
     km:           {kind: km}
-  final:                            # final Phase 2 model: same rule as Phase 1 (CLAUDE.md section 8): highest mean
-                                    # outer C, the simplest within 1 corrected SE of it (F-078)
+  final:                            # final Phase 2 model: same rule as Phase 1: highest mean
+                                    # outer C, the simplest within 1 corrected SE of it
     complexity_order: [cox, coxnet_C, coxnet_C+RNA, rsf]
     within_se: 1.0
-  deploy:                           # step 2c: the final member refitted on all training rows (F-079)
+  deploy:                           # the final member refitted on all training rows
     deploy_folds: 3                 # folds that choose its configuration and give out-of-fold risks (as in Phase 1)
     n_boot: 50                      # bootstrap refits for the patient survival interval
     curve_step_months: 12           # survival curve in the patient output: every 12 months
@@ -228,7 +228,7 @@ phase2:
     - [rsf, cox]
     - [cox, coxnet_C]
 
-# One-time holdout scoring (fixed before the holdout is scored; F-074). The saved final model is applied
+# One-time holdout scoring (fixed before the holdout is scored). The saved final model is applied
 # unchanged; nothing is refitted, recalibrated or re-chosen on holdout labels.
 holdout_scoring:
   n_boot: 2000                      # patient bootstrap of the holdout for every interval and paired difference
@@ -237,12 +237,12 @@ holdout_scoring:
   thresholds_from: deployment out-of-fold predictions   # operating points fixed on training rows only
   consistency: "cv estimate inside the holdout 95% CI; holdout AUROC vs the regression floor"   # reported, not a gate
 
-# Floors: always reported, never eligible to win (CLAUDE.md section 5). Built in step 2.
+# Floors: always reported, never eligible to win.
 floors:
   majority: {}
   age_only: {features: [age_at_diagnosis]}
   npi_file: {features: [nottingham_prognostic_index], primary: true,
-             label: "NPI as supplied (size weight 0.02 per cm)"}                # F-021, F-028
+             label: "NPI as supplied (size weight 0.02 per cm)"}                # the file's NPI uses a 0.02 size weight
   npi_standard: {features: [npi_standard], primary: false,
                  label: "Standard NPI (0.2 x size cm + node stage + grade)",
                  missing: "in-fold median fill plus missing indicator"}         # computed by data.npi_standard
@@ -252,8 +252,8 @@ gene_sets:
     hallmark: h.all.v2026.2.Hs.symbols.gmt
     reactome: ReactomePathways.gmt
   aliases: reference/crosswalk/symbol_aliases.csv
-  min_rna_overlap: 5                # owner confirmed 2026-11-16
-  expected_coverage:                # CLAUDE.md section 3b sanity check, updated for the HIST1H2BC -> H2BC4 alias (F-029);
+  min_rna_overlap: 5                # minimum matched RNA genes for a set to be used for scores
+  expected_coverage:                # coverage sanity check, with the HIST1H2BC -> H2BC4 alias;
                                     # without the alias Reactome was 427 / 140 / 644 / 329
     hallmark: {n_sets: 50, rna_covered: 260, dna_covered: 71, sets_pass: 40}
     reactome: {n_sets: 2874, rna_covered: 428, dna_covered: 141, sets_pass: 647, sets_ge10: 334, median_rna_overlap: 1}
@@ -291,7 +291,7 @@ eda:
     max_abs_diff_stratified: 0.02   # fail if a stratified variable differs more than this
     warn_smd: 0.10                  # warn for other treatment / age imbalance
 
-# Reference values (PLAN.md section 17). tol 0 = exact.
+# Reference values checked by the descriptive EDA. tol 0 = exact.
 reference_values:
   - {key: n_patients, expected: 1904, tol: 0}
   - {key: n_columns, expected: 693, tol: 0}
@@ -344,7 +344,7 @@ reference_values:
   - {key: n_strata, expected: 20, tol: 0}
   - {key: min_stratum, expected: 13, tol: 0}
 
-# Explicit block lists (CLAUDE.md section 3), generated once from the file header and
+# Explicit block lists, generated once from the file header and
 # validated against the file on every load. Order = file order.
 columns:
   id: patient_id
