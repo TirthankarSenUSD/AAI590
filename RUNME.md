@@ -31,7 +31,7 @@ python run.py phase2 --step models                       # Phase 2b: survival me
 python run.py phase2 --step final --models-run M         # Phase 2c: final survival model + patient survival output
 python run.py phase2 --step holdout --final-run F --dry-run   # shuffled outcomes; scores nothing
 python run.py phase2 --step holdout --final-run F        # ONCE ONLY: scores the holdout for Phase 2
-python -m pytest -q                 # 104 tests (about 20 min; includes small end-to-end farm, importance and ensemble runs)
+python -m pytest -q                 # 113 tests (about 25 min; includes small end-to-end farm, importance and ensemble runs)
 ```
 ## Final run A1 (5x5 outer, 3 inner; about 14 h on 8 cores)
 Run in this order. Each line is one run; if one stops, rerun the same line (it resumes from its checkpoints).

@@ -147,7 +147,7 @@ python run.py phase2 --step checks                            # Phase 2: Kaplan-
 python run.py phase2 --step models                            # Phase 2: survival models through the nested CV
 python run.py phase2 --step final --models-run M              # Phase 2: final survival model and patient survival output
 python run.py phase2 --step holdout --final-run F             # ONCE ONLY: score the holdout for Phase 2
-python -m pytest -q              # run the test suite (about 20 min)
+python -m pytest -q              # run the test suite (113 tests, about 25 min)
 ```
 
 The full final run (all arms, 5 × 5 outer splits) takes about 14 hours on 8 cores. Long runs resume from checkpoints when rerun with the same command. `RUNME.md` lists the exact order.
