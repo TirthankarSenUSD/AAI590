@@ -19,7 +19,43 @@ A reproducible machine-learning pipeline that predicts overall survival in breas
 | 4 | Gates and importance | done |
 | 5 | Ensemble and final model | done |
 | 6 | Model-agreement analysis and omics ablation | done |
-| 7 | Report and patient output | next |
+| 7 | Report and patient output | done |
+| – | Final run (5 × 5 outer splits) and one-time holdout scoring | done |
+| P2 | Phase 2: survival analysis, patient survival output, one-time holdout scoring | done |
+| – | Pre-publication cleanup | next |
+
+## Results
+
+All numbers come from generated reports (see `RUNME.md`). Cross-validated (CV) numbers use 25 outer splits on the 1,523 training patients. The 381 holdout patients were scored once, at the end, with the saved models.
+
+**Phase 1: death (any cause), binary**
+
+| | Final model (clinical data) | Age-only baseline |
+|---|---|---|
+| AUROC, cross-validated | 0.765 (0.736–0.794) | 0.686 |
+| AUROC, holdout | 0.784 (0.737–0.829) | 0.684 |
+| Brier score, holdout | 0.184 | 0.222 |
+| Calibration slope, holdout (1 = ideal) | 1.12 | 0.98 |
+
+- The final model is a merged group of four near-duplicate members (elastic-net logistic regression, cause-specific logistic regression, MLP, MLP with embeddings). It uses raw probabilities, with no recalibration.
+- **Do RNA and DNA add anything?** No arm with RNA or DNA was significantly better than clinical data alone (C+RNA +0.007, p = 0.18).
+- **Do the models agree on why?**
+  - Their predictions agree: median correlation 0.92.
+  - Their feature rankings agree only partly: half of the top-10 features are shared on clinical data, and fewer once RNA is added.
+  - A clinical core is consensus: age, cohort, positive lymph nodes, tumour size and surgery type.
+- Label-permutation test: at chance (mean AUROC 0.503).
+
+**Phase 2: overall survival, time to event**
+
+| | Final model (ridge Cox, clinical) | NPI-only Cox | Age-only Cox |
+|---|---|---|---|
+| Harrell's C, cross-validated | 0.675 (0.649–0.702) | 0.635 | 0.590 |
+| Harrell's C, holdout | 0.688 (0.652–0.724) | 0.623 | 0.589 |
+| AUC at 5 / 10 years, holdout | 0.710 / 0.742 | 0.647 / 0.659 | 0.526 / 0.631 |
+
+- **Why Cox over the random survival forest:** the forest ranked patients slightly better (C 0.684, not significant) but its probabilities were compressed (calibration slope about 2). The pre-set rule (simplest model within one standard error) chose the Cox model, which is well calibrated.
+- **RNA:** it did not improve survival prediction either.
+- **Risk groups:** observed 10-year survival on the holdout is 0.85, 0.64, 0.51 and 0.28 from the low to the high group.
 
 ## Pipeline stages
 
@@ -54,6 +90,7 @@ Each stage lives in its own folder under `src/metabric/`, with a `README.md` tha
 ├── run.py                  command-line entry point
 ├── config.yaml             all settings, column lists, reference values
 ├── requirements.txt        exact package versions
+├── requirements-survival.txt  Phase 2 survival package (installed without dependencies)
 ├── src/metabric/           pipeline code, one folder per stage, each with a README.md
 │   ├── cli.py              commands behind run.py
 │   ├── core/               paths, config, artifacts and manifest, statistics
@@ -67,7 +104,7 @@ Each stage lives in its own folder under `src/metabric/`, with a `README.md` tha
 │   ├── ensemble/          fusion, ensemble and final model
 │   ├── agreement/         model agreement and the omics ablation
 │   ├── report/            validation report and patient output
-│   └── phase2/            survival analysis (planned)
+│   └── phase2/            survival analysis
 ├── tests/                  test suite (pytest)
 ├── data/                   METABRIC_RNA_Mutation.csv (read-only)
 ├── reference/              gene-set files; crosswalk/ is built from them
@@ -85,6 +122,7 @@ Requires conda (or any Python 3.14 environment). All packages come from pip; PyT
 conda create -n metabric-v2 python=3.14.3 pip -y
 conda activate metabric-v2
 pip install -r requirements.txt
+pip install --no-deps -r requirements-survival.txt   # scikit-survival for Phase 2 (its unused dependency ecos has no Python 3.14 wheel)
 ```
 
 Do not mix conda's numpy/MKL packages into this environment: a second OpenMP runtime stops PyTorch from importing on Windows.
@@ -99,10 +137,20 @@ python run.py holdout            # create the frozen holdout (once only; refuses
 python run.py splits             # create the frozen nested CV splits (once only; refuses if they exist)
 python run.py eda --mode both    # EDA: descriptive (all patients) and modelling (training rows only)
 python run.py harness            # baselines ("floors") through the nested cross-validation
-python run.py farm               # model farm through the same nested cross-validation (about 3.5 h on 8 cores)
-python run.py importance         # gates and feature importance of the farm winners (about 2.5 h; --reuse RUN_ID: 15 min)
-python -m pytest -q              # run the test suite (about 3 min)
+python run.py farm --arms C      # model farm through the same nested cross-validation (one run per arm; see RUNME.md)
+python run.py importance         # gates and feature importance of the farm winners
+python run.py ensemble  --farm-runs ...                       # fusion, ensembles and the final model
+python run.py agreement --farm-runs ... --importance-run ...  # model agreement and the omics ablation
+python run.py report    --farm-runs ... --ensemble-run ... --agreement-run ...   # validation report, final model, patient output
+python run.py score-holdout --report-run REP                  # ONCE ONLY: score the holdout (--dry-run to check first)
+python run.py phase2 --step checks                            # Phase 2: Kaplan-Meier, proportional hazards, collinearity
+python run.py phase2 --step models                            # Phase 2: survival models through the nested CV
+python run.py phase2 --step final --models-run M              # Phase 2: final survival model and patient survival output
+python run.py phase2 --step holdout --final-run F             # ONCE ONLY: score the holdout for Phase 2
+python -m pytest -q              # run the test suite (about 20 min)
 ```
+
+The full final run (all arms, 5 × 5 outer splits) takes about 14 hours on 8 cores. Long runs resume from checkpoints when rerun with the same command. `RUNME.md` lists the exact order.
 
 Each command creates `outputs/<timestamp>_<config hash>/` containing a copy of the config, `manifest.json` and `<stage>/{figures,tables,logs}`. `outputs/latest.json` points at the newest completed run. Every figure is a PNG with a CSV of the plotted numbers and a caption in the manifest.
 
@@ -115,7 +163,7 @@ Each mode writes a generated summary (`eda/tables/<mode>__eda_summary.md`). The 
 
 ### Evaluation harness
 
-All models are scored on the same frozen nested cross-validation: 5 outer folds × 2 repeats on the 1,523 training patients, with 3 inner folds inside each outer training set.
+All models are scored on the same frozen nested cross-validation: 5 outer folds × 5 repeats on the 1,523 training patients, with 3 inner folds inside each outer training set.
 - **Inner folds** make every choice: model selection (simplest model within one standard error of the best), the operating-point threshold, and recalibration.
 - **Outer folds** report the score.
 - **Comparisons** between models are paired and use the corrected resampled t-test.
@@ -130,8 +178,8 @@ Baselines on the training rows (mean outer-fold AUROC, 95% CI):
 | Baseline | AUROC |
 |---|---|
 | Majority class | 0.500 |
-| Age only | 0.685 (0.653–0.718) |
-| NPI as supplied | 0.596 (0.569–0.623) |
+| Age only | 0.686 (0.657–0.714) |
+| NPI as supplied | 0.596 (0.566–0.625) |
 | Standard NPI | 0.616 (0.586–0.645) |
 
 ## Data and gene sets
