@@ -37,8 +37,8 @@ Each stage lives in its own folder under `src/metabric/`, with a `README.md` tha
 | 4 | Importance | Gates, SHAP and permutation importance, partial dependence, interactions | `importance` | built | [importance/README.md](src/metabric/importance/README.md) |
 | 5 | Ensemble | Fused arm, agreement merge, stacker, final model and regression floor | `ensemble` | built | [ensemble/README.md](src/metabric/ensemble/README.md) |
 | 6 | Agreement | Model-agreement analysis, disagreement flag, cause breakdown, omics ablation | `agreement` | built | [agreement/README.md](src/metabric/agreement/README.md) |
-| 7 | Report | Generated validation report, final-model deployment fit, patient-level output | `report` | built | [report/README.md](src/metabric/report/README.md) |
-| P2 | Phase 2 | Survival analysis on the same splits | – | planned | [phase2/README.md](src/metabric/phase2/README.md) |
+| 7 | Report | Generated validation report, final-model deployment fit, patient-level output; one-time holdout scoring | `report`, `score-holdout` | built | [report/README.md](src/metabric/report/README.md) |
+| P2 | Phase 2 | Survival analysis (KM, PH checks, Cox / penalised Cox / random survival forest, patient survival output, one-time holdout) on the same splits | `phase2 --step checks|models|final|holdout` | built | [phase2/README.md](src/metabric/phase2/README.md) |
 
 ## Design principles
 

@@ -7,6 +7,7 @@ All commands run from this folder (the project root). Paths resolve from `config
 conda create -n metabric-v2 python=3.14.3 pip -y
 conda activate metabric-v2
 pip install -r requirements.txt     # exact pins; torch from the PyTorch CPU wheel index
+pip install --no-deps -r requirements-survival.txt   # Phase 2: scikit-survival without ecos (no Python 3.14 wheel; unused)
 ```
 Use the activated env. Do not mix in conda's numpy/MKL packages: that brings a second OpenMP runtime and torch fails to import (FINDINGS F-014, F-027).
 
@@ -23,7 +24,14 @@ python run.py ensemble --farm-runs FARM_3C,FARM_CAUSE                     # 5: e
 python run.py agreement --farm-runs FARM_3C,FARM_CAUSE --importance-run IMP # 6: model agreement and the omics ablation
 python run.py report --farm-runs FARM_3C,FARM_CAUSE --ensemble-run ENS --agreement-run AGR
                                     # 7: validation report, final-model fit (models/final_model.joblib), patient output
-python -m pytest -q                 # 101 tests (about 20 min; includes small end-to-end farm, importance and ensemble runs)
+python run.py score-holdout --report-run REP --dry-run   # checks the code path with shuffled labels (scores nothing)
+python run.py score-holdout --report-run REP             # ONCE ONLY, last: scores the holdout; refuses a second time
+python run.py phase2 --step checks                       # Phase 2a: Kaplan-Meier, proportional hazards, collinearity
+python run.py phase2 --step models                       # Phase 2b: survival members through the nested CV (about 10 min)
+python run.py phase2 --step final --models-run M         # Phase 2c: final survival model + patient survival output
+python run.py phase2 --step holdout --final-run F --dry-run   # shuffled outcomes; scores nothing
+python run.py phase2 --step holdout --final-run F        # ONCE ONLY: scores the holdout for Phase 2
+python -m pytest -q                 # 104 tests (about 20 min; includes small end-to-end farm, importance and ensemble runs)
 ```
 ## Final run A1 (5x5 outer, 3 inner; about 14 h on 8 cores)
 Run in this order. Each line is one run; if one stops, rerun the same line (it resumes from its checkpoints).

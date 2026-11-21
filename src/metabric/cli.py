@@ -101,6 +101,31 @@ def cmd_splits(args) -> str:
     return run.run_id
 
 
+def cmd_phase2(args) -> str:
+    cfg = load_config()
+    extra = ((f" --models-run {args.models_run}" if args.models_run else "")
+             + (f" --final-run {args.final_run}" if args.final_run else "") + (" --dry-run" if args.dry_run else ""))
+    run = Run(cfg, f"phase2 --step {args.step}{extra}")
+    try:
+        if args.step == "checks":
+            from .phase2.stage import run_checks
+            run_checks(cfg, run)
+        elif args.step == "models":
+            from .phase2.cv import run_models
+            run_models(cfg, run)
+        elif args.step == "final":
+            from .phase2.final import run_final
+            run_final(cfg, run, args.models_run)
+        elif args.step == "holdout":
+            from .phase2.final import run_phase2_holdout
+            run_phase2_holdout(cfg, run, args.final_run, dry_run=args.dry_run)
+        run.finalize()
+    except BaseException as exc:
+        run.fail(exc)
+        raise
+    return run.run_id
+
+
 def cmd_harness(args) -> str:
     from .harness.stage import run_harness
     cfg = load_config()
@@ -218,6 +243,11 @@ def main(argv=None) -> int:
     sub.add_parser("holdout", help="create the frozen 20%% holdout (once only)")
     sub.add_parser("splits", help="create the frozen nested CV splits on the training rows (once only)")
     sub.add_parser("harness", help="run the floors through the evaluation harness")
+    p2 = sub.add_parser("phase2", help="Phase 2 survival analysis (step checks: KM, PH and collinearity checks)")
+    p2.add_argument("--step", choices=["checks", "models", "final", "holdout"], required=True)
+    p2.add_argument("--models-run", help="step final: the phase2 models run that chose the final member")
+    p2.add_argument("--final-run", help="step holdout: the phase2 final run whose models/phase2_final.joblib is scored (ONCE)")
+    p2.add_argument("--dry-run", action="store_true", help="step holdout: shuffle the holdout outcomes; scores nothing")
     f = sub.add_parser("farm", help="run the model farm through the harness (members and arms from config)")
     f.add_argument("--members", type=lambda s: s.split(","), default=None, help="comma-separated subset of farm.members")
     f.add_argument("--arms", type=lambda s: s.split(","), default=None, help="comma-separated subset of farm.arms")
@@ -246,7 +276,7 @@ def main(argv=None) -> int:
     args = p.parse_args(argv)
     rid = {"crosswalk": cmd_crosswalk, "holdout": cmd_holdout, "splits": cmd_splits, "harness": cmd_harness,
            "farm": cmd_farm, "importance": cmd_importance, "ensemble": cmd_ensemble, "agreement": cmd_agreement, "report": cmd_report,
-           "score-holdout": cmd_score_holdout, "eda": cmd_eda}[args.cmd](args)
+           "score-holdout": cmd_score_holdout, "phase2": cmd_phase2, "eda": cmd_eda}[args.cmd](args)
     print(f"run complete: outputs/{rid}")
     return 0
 

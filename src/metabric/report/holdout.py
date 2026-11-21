@@ -47,14 +47,14 @@ OP_KEYS = ("sensitivity", "specificity", "ppv", "npv", "f1")
 
 
 # ---------------------------------------------------------------- one-time marker
-def read_marker(cfg: Config) -> dict | None:
-    p = cfg.path("holdout_scored")
+def read_marker(cfg: Config, key: str = "holdout_scored") -> dict | None:
+    p = cfg.path(key)
     return json.loads(p.read_text(encoding="utf-8")) if p.is_file() else None
 
 
-def check_marker(cfg: Config, bundle_sha: str) -> dict | None:
+def check_marker(cfg: Config, bundle_sha: str, key: str = "holdout_scored") -> dict | None:
     """Refuse a second scoring. An interrupted scoring ("started") may be rerun with the same model."""
-    m = read_marker(cfg)
+    m = read_marker(cfg, key)
     if m is None:
         return None
     if m.get("status") == "complete":
@@ -66,10 +66,10 @@ def check_marker(cfg: Config, bundle_sha: str) -> dict | None:
     return m
 
 
-def write_marker(cfg: Config, **fields) -> None:
-    p = cfg.path("holdout_scored")
+def write_marker(cfg: Config, key: str = "holdout_scored", **fields) -> None:
+    p = cfg.path(key)
     p.parent.mkdir(parents=True, exist_ok=True)
-    m = (read_marker(cfg) or {}) | fields
+    m = (read_marker(cfg, key) or {}) | fields
     tmp = p.with_suffix(".tmp")
     tmp.write_text(json.dumps(m, indent=2), encoding="utf-8")
     tmp.replace(p)

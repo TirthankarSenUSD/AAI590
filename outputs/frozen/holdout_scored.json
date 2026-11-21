@@ -1,0 +1,10 @@
+{
+  "status": "complete",
+  "started": "2026-11-21T02:03:27+00:00",
+  "run_id": "20261121-073327_74e54de4",
+  "report_run": "20261121-014521_4132bb2f",
+  "bundle_sha256": "60c3635d2e7386696fda49cd728ed5421f546024beae3778b904ff2a26ace735",
+  "config_hash": "74e54de496",
+  "completed": "2026-11-21T02:05:27+00:00",
+  "holdout_auroc": 0.7835571420477081
+}

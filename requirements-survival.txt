@@ -1,0 +1,6 @@
+# Phase 2 survival models. Install AFTER requirements.txt, without dependencies:
+#   pip install --no-deps -r requirements-survival.txt
+# scikit-survival 0.27.0 is the last release for scikit-learn 1.8. Its dependency ecos (used only by the
+# survival-SVM models, which this project does not use) has no Python 3.14 wheel and needs a C++ compiler,
+# so it is left out. The other dependencies (numexpr, osqp) are pinned in requirements.txt.
+scikit-survival==0.27.0

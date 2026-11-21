@@ -5,7 +5,7 @@ difference, its interval and p-value, so changing a number changes the wording.
 """
 from __future__ import annotations
 
-LOWER_IS_BETTER = {"brier", "log_loss", "recal_brier"}
+LOWER_IS_BETTER = {"brier", "log_loss", "recal_brier", "brier_60", "brier_120"}
 
 
 def verdict(metric: str, diff: float, lo: float, hi: float, p: float, alpha: float = 0.05) -> str:

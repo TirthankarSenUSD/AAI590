@@ -72,3 +72,38 @@ The stage turns the nested-CV results into a generated validation report, refits
   - contributions plus the base value equal the model's log-odds;
   - a single-patient call matches the batch output;
   - out-of-range inputs are flagged and missing inputs are echoed with their handling.
+
+## Holdout scoring (`holdout` stage, the last step of Phase 1)
+
+**Command** (once only):
+```
+python run.py score-holdout --report-run R            # R = the report run whose models/final_model.joblib is scored
+python run.py score-holdout --report-run R --dry-run  # same steps with the holdout labels shuffled; scores nothing
+```
+
+**Steps:**
+1. Checks that report run R completed and used the same data, columns, splits and holdout settings as the current config.
+2. Writes the one-time marker `outputs/frozen/holdout_scored.json` as "started" (with the model file's sha256), then loads the holdout.
+3. Applies the saved final model unchanged: nothing is refitted, recalibrated or re-chosen on holdout labels.
+4. Refits each floor (majority, age-only, the two NPI floors) once on all training rows and scores it on the holdout.
+5. Applies the operating points fixed on the deployment out-of-fold predictions (training rows): the recall target and the F1-maximising threshold.
+6. Computes every interval and paired difference from one patient bootstrap of the holdout (`holdout_scoring.n_boot`, seeded).
+7. Writes the tables, figures, example records and the generated `holdout_report.md`, then sets the marker to "complete".
+
+**Rules:**
+- Once the marker says "complete" the command refuses to run.
+- An interrupted scoring can be rerun only with the same model file.
+- Agreement with cross-validation is reported, not used as a gate: whether the cross-validated estimate lies inside the holdout interval, and whether the holdout AUROC is above the regression floor.
+- `--dry-run` never writes the marker; its report is labelled as meaningless.
+
+**Outputs** (`outputs/<run>/holdout/`):
+- tables: `holdout_metrics`, `holdout_floor_comparisons`, `holdout_operating_points`, `holdout_subgroups`, `holdout_risk_groups`, `holdout_predictions`;
+- `holdout_example_records.json` and `holdout_report.md`;
+- figures: reliability, and risk groups (holdout vs training).
+
+**Config:** `holdout_scoring:` (`n_boot`, `alpha`) and `paths.holdout_scored`.
+
+**Tests** (`tests/test_holdout_scoring.py`, synthetic data only):
+- the scoring recovers a good model and ranks it above weak floors;
+- the report text follows the results and labels a dry run;
+- the marker refuses a second scoring.
