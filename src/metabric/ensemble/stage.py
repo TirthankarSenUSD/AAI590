@@ -180,7 +180,7 @@ def run_ensemble(cfg: Config, run: Run, farm_runs: list[str]) -> dict:
             summ.append({"arm": g.arm.iloc[0], "candidate": c, "metric": m, "mean": v.mean(), "sd": v.std(ddof=1),
                          "ci_low": t["ci_low"], "ci_high": t["ci_high"]})
     summ = pd.DataFrame(summ)
-    st.table("summary", summ, "Ensemble options and the select-and-ensemble procedure: mean and corrected 95% CI over 10 splits")
+    st.table("summary", summ, f"Ensemble options and the select-and-ensemble procedure: mean and corrected 95% CI over {len(splits)} splits")
 
     def paired(a, b):
         fa, fb = F[F.candidate == a].set_index("split_id").auroc, F[F.candidate == b].set_index("split_id").auroc

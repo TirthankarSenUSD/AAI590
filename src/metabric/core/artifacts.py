@@ -23,7 +23,7 @@ from .config import Config
 from .paths import sha256_file
 
 STAGES = ("crosswalk", "eda", "splits", "harness", "farm", "importance", "ensemble",
-          "agreement", "report", "phase2", "models")
+          "agreement", "report", "holdout", "phase2", "models")
 SUBDIRS = ("figures", "tables", "logs")
 RUN_FILES = ("manifest.json", "config.yaml")
 PACKAGES = ("numpy", "pandas", "scipy", "scikit-learn", "matplotlib", "seaborn", "PyYAML")

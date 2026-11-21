@@ -183,6 +183,19 @@ def cmd_report(args) -> str:
     return run.run_id
 
 
+def cmd_score_holdout(args) -> str:
+    from .report.holdout import run_holdout
+    cfg = load_config()
+    run = Run(cfg, f"score-holdout --report-run {args.report_run}" + (" --dry-run" if args.dry_run else ""))
+    try:
+        run_holdout(cfg, run, args.report_run, dry_run=args.dry_run)
+        run.finalize()
+    except BaseException as exc:
+        run.fail(exc)
+        raise
+    return run.run_id
+
+
 def cmd_eda(args) -> str:
     from .eda import run_eda
     cfg = load_config()
@@ -225,11 +238,15 @@ def main(argv=None) -> int:
                     help="farm runs; the first holding the final arm's procedure supplies its metrics")
     rp.add_argument("--ensemble-run", required=True, help="ensemble run that chose the final model")
     rp.add_argument("--agreement-run", required=True, help="agreement run (ablation, disagreement, cause breakdown)")
+    sh = sub.add_parser("score-holdout", help="score the frozen holdout ONCE with the saved final model (last step of Phase 1)")
+    sh.add_argument("--report-run", required=True, help="report run whose models/final_model.joblib is scored")
+    sh.add_argument("--dry-run", action="store_true", help="shuffle the holdout labels: check the code path, score nothing")
     e = sub.add_parser("eda", help="rerunnable EDA stage")
     e.add_argument("--mode", choices=["descriptive", "modelling", "both"], default="both")
     args = p.parse_args(argv)
     rid = {"crosswalk": cmd_crosswalk, "holdout": cmd_holdout, "splits": cmd_splits, "harness": cmd_harness,
-           "farm": cmd_farm, "importance": cmd_importance, "ensemble": cmd_ensemble, "agreement": cmd_agreement, "report": cmd_report, "eda": cmd_eda}[args.cmd](args)
+           "farm": cmd_farm, "importance": cmd_importance, "ensemble": cmd_ensemble, "agreement": cmd_agreement, "report": cmd_report,
+           "score-holdout": cmd_score_holdout, "eda": cmd_eda}[args.cmd](args)
     print(f"run complete: outputs/{rid}")
     return 0
 

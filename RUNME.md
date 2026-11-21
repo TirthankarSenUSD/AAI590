@@ -23,7 +23,7 @@ python run.py ensemble --farm-runs FARM_3C,FARM_CAUSE                     # 5: e
 python run.py agreement --farm-runs FARM_3C,FARM_CAUSE --importance-run IMP # 6: model agreement and the omics ablation
 python run.py report --farm-runs FARM_3C,FARM_CAUSE --ensemble-run ENS --agreement-run AGR
                                     # 7: validation report, final-model fit (models/final_model.joblib), patient output
-python -m pytest -q                 # 100 tests (about 10-15 min; includes small end-to-end farm, importance and ensemble runs)
+python -m pytest -q                 # 101 tests (about 20 min; includes small end-to-end farm, importance and ensemble runs)
 ```
 ## Final run A1 (5x5 outer, 3 inner; about 14 h on 8 cores)
 Run in this order. Each line is one run; if one stops, rerun the same line (it resumes from its checkpoints).

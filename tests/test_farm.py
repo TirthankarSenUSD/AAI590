@@ -122,3 +122,21 @@ def test_run_farm_end_to_end_small(tmp_project):
     assert {"C|logreg_cause", "C+RNA|logreg_cause"} <= set(pairs[pairs.comparison.str.startswith("cause-specific")].a)
     assert facts["permutation"]["n_permutations"] == 2
     assert (run.dir / "farm" / "tables" / "farm_summary.md").is_file()
+
+
+def test_farm_run_without_the_permutation_arm_skips_the_permutation_test(tmp_project):
+    """Farm runs split by arm: only the run holding the permutation arm runs the test (F-072)."""
+    from metabric.core.artifacts import Run
+    from metabric.data import load_dataset
+    from metabric.farm.stage import run_farm
+    from metabric.splits import make_cv_splits, make_holdout, training_ids
+    ds = load_dataset(tmp_project)
+    c, _, _ = make_holdout(tmp_project, ds)
+    c, _, _ = make_cv_splits(c, ds.subset(training_ids(c, ds)))
+    c.raw["farm"].update(n_jobs=2, n_permutations=2, permutation_arm="C", grids={"logreg_en": {"C": [0.1], "l1_ratio": [0.0]}})
+    run = Run(c, "test farm strict", run_id="farm_strict")
+    facts = run_farm(c, run, members=["logreg_en"], arms=["strict_clinical"])
+    run.finalize()
+    assert facts["permutation"] is None and "strict_clinical|best" in facts
+    assert not (run.dir / "farm" / "tables" / "permutation_test.csv").exists()
+    assert "not in this run" in (run.dir / "farm" / "tables" / "farm_summary.md").read_text(encoding="utf-8")

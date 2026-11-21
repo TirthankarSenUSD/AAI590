@@ -142,6 +142,7 @@ def run_report(cfg: Config, run: Run, farm_runs: list[str], ensemble_run: str, a
         "arm": arm, "procedure": proc, "baseline": cfg["ensemble"]["cross_arm_baseline"], "config_hash": cfg.hash,
         "runs": {"farm": ", ".join(farm_runs), "ensemble": ensemble_run, "agreement": agreement_run, "report": run.run_id},
         "n_train": int(len(y)), "n_deaths": int(y.sum()), "base_rate": float(y.mean()), "n_splits": len(splits),
+        "outer_folds": cfg["cv"]["outer_folds"], "outer_repeats": cfg["cv"]["outer_repeats"], "inner_folds": cfg["cv"]["inner_folds"],
         "n_holdout": int(len(full.ids) - len(tr_ids)), "holdout_scored": False, "floor_sd": h["regression_floor_sd"],
         "op_target": h["operating_point_sensitivity"], "context_col": rc["context_column"],
         "headline": {"option": option, "nested_auroc": float(final["select_and_ensemble_auroc"]),

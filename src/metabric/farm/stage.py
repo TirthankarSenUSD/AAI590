@@ -182,26 +182,31 @@ def run_farm(cfg: Config, run: Run, members=None, arms=None) -> dict:
     rf = H.regression_floor(pf)
     st.table("regression_floor", rf, "Regression floor per procedure: mean - 2 SD of outer-fold AUROC (provisional until the final model)")
 
+    # The permutation test runs only in a farm run that includes the permutation arm. Runs split by arm
+    # must not each repeat it on their own first arm (F-072): it is one test of the pipeline, not per arm.
     perm_arm = cfg["farm"].get("permutation_arm", "C")
-    perm_arm = perm_arm if perm_arm in arms else arms[0]
-    perm_names = procs[f"{perm_arm}|best"]
-    perm_cands = [c for c in cands if c.name in set(perm_names)]
-    shuffle = [0]
-    def proc_fn(y):
-        label = "permutation: observed labels" if shuffle[0] == 0 else f"permutation: shuffle {shuffle[0]}"
-        shuffle[0] += 1
-        r = H.evaluate(perm_cands, y=y, select=True, light=True, n_jobs=n_jobs, log=st.log.info, label=label)
-        return float(r.selection.outer_auroc.mean())
-    t1 = time.time()
-    perm, perm_s = H.permutation_test(proc_fn, cfg["farm"].get("n_permutations", cfg["harness"]["n_permutations"]), rng)
-    st.log.info("permutation test (%s|best, %d shuffles) in %.0f s", perm_arm, len(perm), time.time() - t1)
-    st.table("permutation_test", perm, f"Label-permutation test of the full {perm_arm}|best procedure (selection inside every outer fold)")
-    st.table("permutation_summary", pd.DataFrame([{**perm_s, "procedure": f"{perm_arm}|best"}]), "Permutation test summary (must be at chance)")
+    perm_s = None
+    if f"{perm_arm}|best" in procs:
+        perm_names = procs[f"{perm_arm}|best"]
+        perm_cands = [c for c in cands if c.name in set(perm_names)]
+        shuffle = [0]
+        def proc_fn(y):
+            label = "permutation: observed labels" if shuffle[0] == 0 else f"permutation: shuffle {shuffle[0]}"
+            shuffle[0] += 1
+            r = H.evaluate(perm_cands, y=y, select=True, light=True, n_jobs=n_jobs, log=st.log.info, label=label)
+            return float(r.selection.outer_auroc.mean())
+        t1 = time.time()
+        perm, perm_s = H.permutation_test(proc_fn, cfg["farm"].get("n_permutations", cfg["harness"]["n_permutations"]), rng)
+        st.log.info("permutation test (%s|best, %d shuffles) in %.0f s", perm_arm, len(perm), time.time() - t1)
+        st.table("permutation_test", perm, f"Label-permutation test of the full {perm_arm}|best procedure (selection inside every outer fold)")
+        st.table("permutation_summary", pd.DataFrame([{**perm_s, "procedure": f"{perm_arm}|best"}]), "Permutation test summary (must be at chance)")
+    else:
+        st.log.info("permutation test skipped: the permutation arm %s is not in this run (it runs in the run that has it)", perm_arm)
 
     _figures(st, summ, sel_all, rel, arms, members)
     facts = _facts(summ, pair_t, gate, stab, perm_s, perm_arm, arms, members, len(cands), n_jobs, time.time() - t0)
     st.text("farm_summary.md", _summary_md(run, cfg, facts, arms, members), "Auto-generated farm summary (computed wording)")
-    if not perm_s["at_chance"]:
+    if perm_s is not None and not perm_s["at_chance"]:
         raise RuntimeError(f"permutation test not at chance: {perm_s}")
     return facts
 
@@ -234,7 +239,7 @@ def _figures(st, summ, sel_all, rel, arms, members):
     for i, m in enumerate(members):
         ax.barh(wins.index, wins[m], left=left, color=P.CAT[i], label=m, height=0.6, edgecolor=P.SURFACE, linewidth=2)
         left += wins[m].to_numpy()
-    ax.set_xlabel("Outer splits won (of 10)")
+    ax.set_xlabel(f"Outer splits won (of {sel_all.split_id.nunique()})")
     ax.set_title("Which member wins inside each outer fold")
     ax.legend(loc="lower right", ncol=2)
     P.grid(ax, "x")
@@ -267,7 +272,8 @@ def _facts(summ, pairs, gate, stab, perm, perm_arm, arms, members, n_cands, n_jo
     F["representations_kept"] = rp[rp.ci_low > 0][["a", "b", "mean_diff", "ci_low", "ci_high", "p"]].round(4).to_dict("records")
     F["representations_tested"] = int(len(rp))
     F["stability"] = stab[stab.procedure.str.endswith("|best")][["procedure", "top_member", "top_member_share", "top_representation"]].to_dict("records")
-    F["permutation"] = {**{k: (round(v, 4) if isinstance(v, float) else v) for k, v in perm.items()}, "procedure": f"{perm_arm}|best"}
+    F["permutation"] = None if perm is None else \
+        {**{k: (round(v, 4) if isinstance(v, float) else v) for k, v in perm.items()}, "procedure": f"{perm_arm}|best"}
     return F
 
 
@@ -301,9 +307,10 @@ def _summary_md(run, cfg, F, arms, members) -> str:
         L.append(f"- {s['procedure']}: `{s['top_member']}` wins {s['top_member_share']:.0%} of outer splits "
                  f"(most frequent RNA representation: {s['top_representation']}).")
     P_ = F["permutation"]
-    L += [f"- Label-permutation test of the full {P_['procedure']} procedure ({P_['n_permutations']} shuffles): mean AUROC "
-          f"{P_['perm_mean']:.3f} (max {P_['perm_max']:.3f}) against {P_['observed_auroc']:.3f}; "
-          f"{'at chance, as required' if P_['at_chance'] else 'NOT at chance: investigate'}.",
+    L += [(f"- Label-permutation test of the full {P_['procedure']} procedure ({P_['n_permutations']} shuffles): mean AUROC "
+           f"{P_['perm_mean']:.3f} (max {P_['perm_max']:.3f}) against {P_['observed_auroc']:.3f}; "
+           f"{'at chance, as required' if P_['at_chance'] else 'NOT at chance: investigate'}.") if P_ else
+          f"- Label-permutation test: not in this run (it runs in the farm run that includes the {cfg['farm'].get('permutation_arm', 'C')} arm).",
           f"- Overfit gate (report only; never excludes from selection): overfitting (train-CV gap > 0.05 or slope < 0.8) in "
           f"{'no procedure' if not F['gate_overfit'] else ', '.join(F['gate_overfit'])}; under-confident (slope > 1.2, recalibrated "
           f"probabilities are primary) in {'no procedure' if not F['gate_recalibrate'] else ', '.join(F['gate_recalibrate'])}.", ""]

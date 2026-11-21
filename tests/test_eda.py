@@ -42,11 +42,12 @@ def test_reference_values_all_match(eda_run):
     assert fd["n_reference_mismatch"] == 0, fd["reference_mismatches"]
 
 
-def test_modelling_mode_uses_training_rows_only(eda_run):
+def test_modelling_mode_uses_training_rows_only(eda_run, cfg):
     _, _, fm = eda_run
     assert fm["n_patients"] == 1523 and fm["n_train"] == 1523 and fm["n_holdout"] == 381
     assert fm["n_balance_fail"] == 0
-    assert fm["cv_splits_present"] and fm["n_cv_splits"] == 10 and fm["n_fold_balance_fail"] == 0
+    n_splits = cfg["cv"]["outer_folds"] * cfg["cv"]["outer_repeats"]
+    assert fm["cv_splits_present"] and fm["n_cv_splits"] == n_splits and fm["n_fold_balance_fail"] == 0
 
 
 def test_every_figure_has_csv_and_caption(eda_run):

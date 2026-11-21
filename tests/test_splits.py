@@ -47,7 +47,7 @@ def test_make_cv_splits_frozen_nested_and_clean(tmp_project):
     cfg3, sp, merges = make_cv_splits(cfg2, ds.subset(tr))
     assert cfg3["cv"]["splits_sha256"] and cfg3["holdout"]["sha256"] == cfg2["holdout"]["sha256"]
     s = load_cv_splits(cfg3, tr)
-    assert s.split_id.nunique() == 10 and not set(s.patient_id) & set(ds.ids.difference(tr))   # no holdout rows
+    assert s.split_id.nunique() == cfg3["cv"]["outer_folds"] * cfg3["cv"]["outer_repeats"] and not set(s.patient_id) & set(ds.ids.difference(tr))   # no holdout rows
     check_split_hygiene(splits_from_table(s), tr)
     assert merges.empty                                            # smallest training stratum (11) >= 5 folds
     test = s[s.role == "test"]
