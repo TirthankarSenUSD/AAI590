@@ -1,8 +1,8 @@
-# config.yaml: single source of settings for the METABRIC v2 pipeline.
+# config.yaml: single source of settings for the METABRIC pipeline.
 # Paths are relative to the project root (the folder holding this file).
 # Changing any value changes the config hash and therefore the run_id.
 
-project: metabric_v2
+project: metabric
 seed: 42
 
 paths:

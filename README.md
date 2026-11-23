@@ -1,4 +1,4 @@
-# METABRIC multi-omics survival classification (v2)
+# METABRIC multi-omics survival classification
 
 A reproducible machine-learning pipeline that predicts overall survival in breast cancer from clinical, gene-expression (RNA) and mutation (DNA) data in the METABRIC cohort (1,904 patients).
 

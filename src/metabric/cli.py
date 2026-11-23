@@ -250,7 +250,7 @@ def cmd_eda(args) -> str:
 
 
 def main(argv=None) -> int:
-    p = argparse.ArgumentParser(prog="run.py", description="METABRIC v2 pipeline")
+    p = argparse.ArgumentParser(prog="run.py", description="METABRIC pipeline")
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("crosswalk", help="build reference/crosswalk/ from the configured gene-set files")
     sub.add_parser("holdout", help="create the frozen 20%% holdout (once only)")
