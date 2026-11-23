@@ -1,0 +1,5 @@
+# Data, reference and frozen files are hash-checked byte for byte: never convert their line endings
+# (Git for Windows defaults to core.autocrlf=true, which would rewrite \n as \r\n on checkout).
+data/** -text
+reference/** -text
+outputs/frozen/** -text
